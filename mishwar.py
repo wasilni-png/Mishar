@@ -401,7 +401,7 @@ def get_main_kb(role, is_verified=True):
         if not is_verified:
             return ReplyKeyboardMarkup([[KeyboardButton("⏳ الحساب قيد المراجعة")]], resize_keyboard=True)
         return ReplyKeyboardMarkup([
-            [KeyboardButton("📍 تحديث موقعي")],
+          [KeyboardButton("📍 تحديث موقعي"), KeyboardButton("📝 تحديث الأحياء")],
             [KeyboardButton("ℹ️ حالة اشتراكي")],
             [KeyboardButton("📞 تواصل مع الإدارة")] # تم إضافة الزر هنا
         ], resize_keyboard=True)
