@@ -63,19 +63,28 @@ ADMIN_IDS = [7996171713, 7513630480]
 # الكلمات المفتاحية للبحث في المجموعات
 
 
-# --- 1. إعدادات الأحياء الذكية (المدينة المنورة) ---
+# --- 1. إعدادات الأحياء الذكية (مكة المكرمة) ---
 CITIES_DISTRICTS = {
-    "المدينة المنورة": [
-        "الإسكان", "البحر", "البدراني", "الفتح", "التلال", "الجرف", "الحزام", "الحمراء", 
-        "الخالدية", "الدويخله", "الرانونا", "الربوة", "الشروق", "الشرق", 
-        "العاقول", "العريض", "العزيزية", "العنابس", "القبلتين", "المبعوث", 
-        "المطار", "المغيسله", "الملك فهد", "النبلاء", "الهجرة", "باقدو", 
-        "بني حارثة", "حديقة الملك فهد", "سيد الشهداء", "شوران", "قباء", "مهزور",
-        "شظاة", "مستشفى الملك فهد", "مستشفى الملك سلمان", "مستشفى الولادة", 
-        "مستشفى المواساة", "النور مول", "العالية مول", "القارات", 
-        "العيون", "طريق الملك عبدالعزيز", "الدائري"
+    "مكة المكرمة": [
+        # --- المعالم الرئيسية ---
+        "الحرم", "المسجد الحرام", "برج الساعة", "جبل النور", "جبل ثور", "عرفات", "مزدلفة", "منى",
+        
+        # --- الأحياء المركزية والسكنية ---
+        "العزيزية", "الشوقية", "الرصيفة", "السبهان", "البطحاء", "المسفلة", "العتيبية", "الزهراء",
+        "النزهة", "الشهداء", "الضيافة", "الزايدي", "ولي العهد", "الكعكية", "بطحاء قريش", 
+        "العوالي", "النسيم", "الشرائع", "الراشدية", "جبل النور", "المعابدة", "الروضة", 
+        "الخالدية", "الشراشف", "الهنداوية", "الطندباوي", "حارة الباب", "جرول", "التيسير",
+        
+        # --- أحياء إضافية ومعالم حيوية ---
+        "الفيحاء", "البحيرات", "النوارية", "العمرة", "التنعيم", "وادي جليل", "مخطط البنوك",
+        "كدي", "ريع بخش", "اجياد", "الغزة", "محبس الجن", "الشبيكة", "ريع ذاخر",
+        
+        # --- المستشفيات والمولات ---
+        "مستشفى النور", "مستشفى الملك فيصل", "مستشفى حراء", "مدينة الملك عبدالله الطبية",
+        "مكة مول", "الحجاز مول", "سوق الضيافة", "سيتي سنتر", "قطار الحرمين"
     ]
 }
+
 
 LAST_REPLY_TIME = {}
 # الذاكرة المؤقتة (Cache)
@@ -530,7 +539,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # أ- عرض قائمة الأحياء للراكب
     if data == "order_by_district":
-        districts = CITIES_DISTRICTS.get("المدينة المنورة", [])
+        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
         keyboard = []
         for i in range(0, len(districts), 2):
             row = [InlineKeyboardButton(districts[i], callback_data=f"searchdist_{districts[i]}")]
@@ -539,7 +548,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(row)
         
         await query.edit_message_text(
-            "📍 **أحياء المدينة المنورة**\nاختر الحي للبحث عن كباتن متوفرين فيه:",
+            "📍 **أحياء مكة المكرمة**\nاختر الحي للبحث عن كباتن متوفرين فيه:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.MARKDOWN
         )
@@ -608,7 +617,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- [2] قسم إدارة الأحياء (للسائق) ---
     
     elif data == "manage_districts":
-        districts = CITIES_DISTRICTS.get("المدينة المنورة", [])
+        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
         user_info = USER_CACHE.get(user_id, {})
         current_dists = user_info.get('districts', "") or ""
         
@@ -691,7 +700,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         USER_CACHE[user_id]['districts'] = new_districts_str
 
         # 4. بناء لوحة المفاتيح الجديدة
-        districts = CITIES_DISTRICTS.get("المدينة المنورة", [])
+        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
         keyboard = []
         for i in range(0, len(districts), 2):
             row = []
@@ -1713,7 +1722,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== دالة عرض الأحياء (محدثة) ====================
 
-async def show_districts_by_city(update: Update, context: ContextTypes.DEFAULT_TYPE, city_name: str = "المدينة المنورة", is_edit=False):
+async def show_districts_by_city(update: Update, context: ContextTypes.DEFAULT_TYPE, city_name: str = "مكة المكرمة", is_edit=False):
     # تحديد المستخدم والكائن المستهدف
     if update.callback_query:
         user_id = update.callback_query.from_user.id
@@ -1797,8 +1806,8 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: pass
 
     if data == "districts_settings":
-        # عرض أحياء المدينة المنورة للسائق فوراً
-        from_city = "المدينة المنورة"
+        # عرض أحياء مكة المكرمة للسائق فوراً
+        from_city = "مكة المكرمة"
         await show_districts_by_city(update, context, from_city)
         return
 
@@ -2080,7 +2089,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 1. عند الضغط على زر "طلب رحلة بالاحياء"
     elif data == "order_by_district":
         # جلب قائمة الأحياء
-        districts = CITIES_DISTRICTS.get("المدينة المنورة", [])
+        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
         if not districts:
             await query.answer("⚠️ قائمة الأحياء غير متوفرة حالياً.")
             return
@@ -2100,7 +2109,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="main_menu")])
         
         await query.edit_message_text(
-            "📍 **أحياء المدينة المنورة:**\nاختر الحي الذي تود البحث فيه عن كابتن:",
+            "📍 **أحياء مكة المكرمة:**\nاختر الحي الذي تود البحث فيه عن كابتن:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.MARKDOWN
         )
@@ -2167,14 +2176,14 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # --- خيار ب: كابتن نخبة (بحث باختيار المدينة والحي) ---
+    # --- خيار ب: كابتن نخبة (بحث باختيار مكة المكرمة والحي) ---
     
 
     # ===============================================================
     # 2. التنقل داخل قائمة المدن والأحياء
     # ===============================================================
 
-    # --- تم اختيار المدينة -> عرض الأحياء ---
+    # --- تم اختيار مكة المكرمة -> عرض الأحياء ---
     
 
     # --- تم اختيار الحي -> عرض الكباتن ---
@@ -2550,8 +2559,8 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def districts_settings_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # بدلاً من بناء قائمة المدن، ننتقل مباشرة لعرض أحياء المدينة المنورة
-    await show_districts_by_city(update, context, "المدينة المنورة")
+    # بدلاً من بناء قائمة المدن، ننتقل مباشرة لعرض أحياء مكة المكرمة
+    await show_districts_by_city(update, context, "مكة المكرمة")
 
 
 # --- أوامر الأدمن ---
@@ -2773,7 +2782,7 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
     "وينك", "متاح", "مطلوب", "ابي", "بغيت", "محتاج", "احتاج", "أدور", 
     "أدري", "في أحد", "فيه أحد", "يوديني", "يوصلني", "متوفر", "ممكن",
 
-    # كلمات مرتبطة بالوجهات في المدينة
+    # كلمات مرتبطة بالوجهات في مكة المكرمة
     "الحرم", "النبوي", "قباء", "المطار", "القطار", "الميقات", "سيد الشهداء",
 
     # كلمات الخدمات
@@ -2802,7 +2811,7 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
                 for j in range(3):
                     if i + j < len(districts_list):
                         d = districts_list[i + j]
-                        row.append(InlineKeyboardButton(d, callback_data=f"searchdist_المدينة المنورة_{d}"))
+                        row.append(InlineKeyboardButton(d, callback_data=f"searchdist_مكة المكرمة_{d}"))
                 keyboard.append(row)
 
             await update.message.reply_text(
@@ -3074,7 +3083,7 @@ async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def group_districts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    districts = CITIES_DISTRICTS.get("المدينة المنورة", [])
+    districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
     if not districts: return
 
     keyboard = []
@@ -3088,7 +3097,7 @@ async def group_districts_handler(update: Update, context: ContextTypes.DEFAULT_
         keyboard.append(row)
 
     await update.message.reply_text(
-        "📍 **أحياء المدينة المنورة المتاحة:**\nإضغط على الحي لعرض الكباتن المتوفرين والطلب مباشرة عبر الخاص 👇",
+        "📍 **أحياء مكة المكرمة المتاحة:**\nإضغط على الحي لعرض الكباتن المتوفرين والطلب مباشرة عبر الخاص 👇",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN
     )
