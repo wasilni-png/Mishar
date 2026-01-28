@@ -452,6 +452,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if arg_value.startswith("sd_"):
+            try:
+                index = int(arg_value.split("_")[1])
+                districts = CITIES_DISTRICTS.get("المدينة المنورة", [])
+                
+                if index < len(districts):
+                    selected_dist = districts[index]
+                    await sync_all_users()
+                    
+                    def clean(t): 
+                        return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا")
+                    
+                    target_clean = clean(selected_dist)
+
+                    matched = [
+                        d for d in CACHED_DRIVERS 
+                        if d.get('districts') and target_clean in clean(d['districts'])
+                    ]
+
+                    if matched:
+                        kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched[:6]]
+                        await update.message.reply_text(
+                            f"✅ وجدنا كباتن في حي **{selected_dist}**:\nاختر الكابتن لبدء المحادثة:", 
+                            reply_markup=InlineKeyboardMarkup(kb)
+                        )
+                    else:
+                        await update.message.reply_text(
+                            f"📍 حي {selected_dist} لا يوجد به كباتن حالياً، جرب طلب مشوار عام بالـ GPS.", 
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🌍 طلب GPS", callback_data="order_general")]])
+                        )
+                return 
+            except Exception as e:
+                print(f"Error in sd_ deep link: {e}")
     # 4. معالجة الروابط العميقة (Deep Linking)
     if context.args:
         arg_value = context.args[0]
