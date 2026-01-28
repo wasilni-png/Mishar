@@ -56,7 +56,7 @@ def run_flask():
 # ==================== ⚙️ 1. الإعدادات ====================
 
 # 🔴🔴 هام: بيانات الاتصال (يفضل وضعها في متغيرات بيئة لاحقاً)
-DB_URL = "postgresql://postgres.nmteaqxrtcegxmgvsbzr:mohammedfahdypb@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
+DB_URL = "postgresql://postgres.hwhnzoailsdnytrquvml:6iYskAm*37jJ_SJ@aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres"
 BOT_TOKEN = "8588537913:AAF8yxyeQBHbpdN4aJHpfp5-DUxFvQaUb10"
 ADMIN_IDS = [7996171713, 7513630480]
 
