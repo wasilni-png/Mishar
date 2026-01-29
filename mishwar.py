@@ -430,42 +430,39 @@ def get_main_kb(role, is_verified=True):
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or "عزيزي"
-    
-    # 1. تنظيف الذاكرة وتحديث الكاش
-    context.user_data.clear()
-    await sync_all_users()
+    chat_id = update.effective_chat.id
 
-    # 2. جلب بيانات المستخدم من الكاش
+    # 1. تنظيف الذاكرة المؤقتة وضمان تحديث الكاش
+    context.user_data.clear()
+    await sync_all_users() # تحديث البيانات من قاعدة البيانات
+
+    # 2. جلب بيانات المستخدم
     user = USER_CACHE.get(user_id) or USER_CACHE.get(str(user_id))
-    
     has_phone = False
     if user:
         phone = str(user.get('phone', ''))
         if phone and phone not in ['0000000000', 'None', '']:
             has_phone = True
 
-    # 3. معالجة الدخول بدون روابط عميقة (Start عادي)
-    if not context.args and has_phone:
-        await update.message.reply_text(
-            f"👋 مرحباً بك مجدداً يا {user['name']}", 
-            reply_markup=get_main_kb(user['role'], user['is_verified'])
-        )
-        return
+    # 3. معالجة الروابط العميقة (Deep Linking)
+    if context.args:
+        arg_value = context.args[0]
 
-    if arg_value.startswith("sd_"):
+        # --- حالة (sd_): اختيار حي من القروب ---
+        if arg_value.startswith("sd_"):
             try:
                 index = int(arg_value.split("_")[1])
-                districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
+                # ملاحظة: تأكد أن CITIES_DISTRICTS الآن تحتوي على "مكة المكرمة"
+                city_key = "مكة المكرمة" 
+                districts = CITIES_DISTRICTS.get(city_key, [])
                 
                 if index < len(districts):
                     selected_dist = districts[index]
-                    await sync_all_users()
                     
                     def clean(t): 
                         return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا")
                     
                     target_clean = clean(selected_dist)
-
                     matched = [
                         d for d in CACHED_DRIVERS 
                         if d.get('districts') and target_clean in clean(d['districts'])
@@ -474,52 +471,30 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if matched:
                         kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched[:6]]
                         await update.message.reply_text(
-                            f"✅ وجدنا كباتن في حي **{selected_dist}**:\nاختر الكابتن لبدء المحادثة:", 
-                            reply_markup=InlineKeyboardMarkup(kb)
+                            f"✅ وجدنا كباتن في حي **{selected_dist}** بمكة:\nاختر الكابتن لبدء المحادثة:", 
+                            reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN
                         )
                     else:
                         await update.message.reply_text(
-                            f"📍 حي {selected_dist} لا يوجد به كباتن حالياً، جرب طلب مشوار عام بالـ GPS.", 
-                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🌍 طلب GPS", callback_data="order_general")]])
+                            f"📍 حي {selected_dist} لا يوجد به كباتن حالياً، جرب الطلب العام.", 
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🌍 طلب عام", callback_data="order_general")]])
                         )
                 return 
             except Exception as e:
-                print(f"Error in sd_ deep link: {e}")
-    # 4. معالجة الروابط العميقة (Deep Linking)
-    if context.args:
-        arg_value = context.args[0]
+                print(f"Error in sd_: {e}")
 
-        # --- حالة طلب رحلة (order_) ---
-        if arg_value.startswith("order_"):
+        # --- حالة (order_): طلب كابتن محدد ---
+        elif arg_value.startswith("order_"):
             target_id = arg_value.replace("order_", "")
-
-            # أ) المستخدم غير مسجل
+            
             if not has_phone:
-                context.user_data['state'] = 'WAIT_RIDER_PHONE'
-                context.user_data['temp_name'] = first_name
-                context.user_data['pending_order_driver'] = target_id 
-                
-                await update.message.reply_text(
-                    f"👋 أهلاً بك يا {first_name}!\n\n"
-                    "لإتمام طلبك، نحتاج لتوثيق حسابك.\n"
-                    "✏️ **يرجى كتابة رقم جوالك الآن** (مثال: 05xxxxxxx):",
-                    reply_markup=ReplyKeyboardRemove(),
-                    parse_mode=ParseMode.MARKDOWN
-                )
+                context.user_data.update({'state': 'WAIT_RIDER_PHONE', 'temp_name': first_name, 'pending_order_driver': target_id})
+                await update.message.reply_text(f"👋 أهلاً بك!\nلإتمام طلبك، يرجى كتابة **رقم جوالك** أولاً:")
                 return
 
-            # ب) المستخدم مسجل -> تحديد نص الرسالة بناءً على نوع الطلب
-            # ✅ تم توحيد اسم المتغير هنا إلى msg_text (حروف صغيرة) لمنع الـ Crash
-            if target_id == "general":
-                context.user_data['state'] = 'WAIT_GENERAL_DETAILS'
-                msg_text = "🌍 **إلى أين وجهتك؟**"
-            else:
-                context.user_data['driver_to_order'] = target_id
-                context.user_data['state'] = 'WAIT_TRIP_DETAILS'
-                msg_text = "📝 **اكتب تفاصيل مشوارك الآن** لإرسالها للكابتن:"
-
+            context.user_data.update({'driver_to_order': target_id, 'state': 'WAIT_TRIP_DETAILS'})
             await update.message.reply_text(
-                f"✅ مرحباً بك مجدداً يا {first_name}\n\n{msg_text}",
+                f"📝 **يا هلا بك يا {user['name']}**\nاكتب تفاصيل مشوارك الآن (الوجهة والوقت):",
                 reply_markup=ReplyKeyboardMarkup([[KeyboardButton("❌ إلغاء الطلب")]], resize_keyboard=True),
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -527,34 +502,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # --- حالات التسجيل ---
         elif arg_value in ["driver_reg", "reg_driver"]:
-            context.user_data['state'] = 'WAIT_NAME'
-            context.user_data['reg_role'] = 'driver'
-            await update.message.reply_text(
-                "🚖 **أهلاً بك يا كابتن**\nيرجى كتابة اسمك الثلاثي للبدء في التسجيل:",
-                reply_markup=ReplyKeyboardRemove(),
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return
-            
-        elif arg_value == "reg_rider":
-            context.user_data['state'] = 'WAIT_RIDER_PHONE'
-            context.user_data['temp_name'] = first_name
-            await update.message.reply_text(
-                f"🎉 حياك الله يا {first_name}!\nللتسجيل، يرجى **كتابة رقم جوالك**:",
-                reply_markup=ReplyKeyboardRemove(),
-                parse_mode=ParseMode.MARKDOWN
-            )
+            context.user_data.update({'state': 'WAIT_NAME', 'reg_role': 'driver'})
+            await update.message.reply_text("🚖 **أهلاً بك يا كابتن**\nيرجى كتابة اسمك الثلاثي للبدء:")
             return
 
-    # 5. إذا وصل الكود هنا ولم ينفذ أي Return (مستخدم جديد بدون رابط)
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("👤 تسجيل كراكب", callback_data="reg_rider"),
-         InlineKeyboardButton("🚗 تسجيل ككابتن", callback_data="reg_driver")]
-    ])
-    await update.message.reply_text(
-        f"مرحباً بك {first_name}، أنت غير مسجل لدينا.\nاختر نوع الحساب للبدء:", 
-        reply_markup=kb
-    )
+    # 4. الدخول العادي (بدون روابط)
+    if user and has_phone:
+        await update.message.reply_text(
+            f"👋 مرحباً بك مجدداً يا {user['name']}", 
+            reply_markup=get_main_kb(user['role'], user['is_verified'])
+        )
+    else:
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👤 تسجيل كراكب", callback_data="reg_rider"),
+             InlineKeyboardButton("🚗 تسجيل ككابتن", callback_data="reg_driver")]
+        ])
+        await update.message.reply_text(f"مرحباً بك {first_name}، أنت غير مسجل لدينا.\nاختر نوع الحساب للبدء:", reply_markup=kb)
 
 # دالة مساعدة للتسجيل التلقائي لضمان عدم تكرار الكود
 
