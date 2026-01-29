@@ -63,27 +63,21 @@ ADMIN_IDS = [7996171713, 7513630480]
 # الكلمات المفتاحية للبحث في المجموعات
 
 
-# --- 1. إعدادات الأحياء الذكية (مكة المكرمة) ---
+# --- 1. إعدادات الأحياء الذكية (جدة) ---
 CITIES_DISTRICTS = {
     "مكة المكرمة": [
-        # --- المعالم الرئيسية ---
-        "الحرم", "المسجد الحرام", "برج الساعة", "جبل النور", "جبل ثور", "عرفات", "مزدلفة", "منى",
-        
-        # --- الأحياء المركزية والسكنية ---
-        "العزيزية", "الشوقية", "الرصيفة", "السبهان", "البطحاء", "المسفلة", "العتيبية", "الزهراء",
-        "النزهة", "الشهداء", "الضيافة", "الزايدي", "ولي العهد", "الكعكية", "بطحاء قريش", 
-        "العوالي", "النسيم", "الشرائع", "الراشدية", "جبل النور", "المعابدة", "الروضة", 
-        "الخالدية", "الشراشف", "الهنداوية", "الطندباوي", "حارة الباب", "جرول", "التيسير",
-        
-        # --- أحياء إضافية ومعالم حيوية ---
-        "الفيحاء", "البحيرات", "النوارية", "العمرة", "التنعيم", "وادي جليل", "مخطط البنوك",
-        "كدي", "ريع بخش", "اجياد", "الغزة", "محبس الجن", "الشبيكة", "ريع ذاخر",
-        
-        # --- المستشفيات والمولات ---
-        "مستشفى النور", "مستشفى الملك فيصل", "مستشفى حراء", "مدينة الملك عبدالله الطبية",
-        "مكة مول", "الحجاز مول", "سوق الضيافة", "سيتي سنتر", "قطار الحرمين"
+        "الشوقيه", "العزيزيه", "الرصيفه", "بطحاء قريش", "العوالي", "الشرائع", 
+        "النزهه", "الزايدي", "ولي العهد", "الكعكيه", "المسفله", "العتيبيه",
+        "النواريه", "العمره", "البحيرات", "جبل النور", "سلطانه", "الخالديه"
+    ],
+    "جدة": [
+        "الصفا", "الروضه", "النهضه", "السلامه", "النعيم", "المرجان", "ابحر", 
+        "الحمدانيه", "السامر", "المنار", "الفهد", "الروابي", "السليمانيه", 
+        "الفيحاء", "المطار", "البلد", "البغداديه", "الشاطئ", "النسيم", "التحليه"
     ]
 }
+
+
 
 
 LAST_REPLY_TIME = {}
@@ -451,38 +445,44 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # --- حالة (sd_): اختيار حي من القروب ---
         if arg_value.startswith("sd_"):
             try:
-                index = int(arg_value.split("_")[1])
-                # ملاحظة: تأكد أن CITIES_DISTRICTS الآن تحتوي على "مكة المكرمة"
-                city_key = "مكة المكرمة" 
-                districts = CITIES_DISTRICTS.get(city_key, [])
+                # المتوقع: sd_جدة_5 أو sd_مكة المكرمة_3
+                parts = arg_value.split("_")
                 
-                if index < len(districts):
-                    selected_dist = districts[index]
+                # التأكد من صحة الرابط (يجب أن يحتوي على 3 أجزاء: sd, city, index)
+                # ملاحظة: نستخدم len(parts) >= 3 لضمان وجود المدينة والرقم
+                if len(parts) >= 3:
+                    city_key = parts[1] # المدينة
+                    index = int(parts[2]) # الرقم
                     
-                    def clean(t): 
-                        return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا")
+                    districts = CITIES_DISTRICTS.get(city_key, [])
                     
-                    target_clean = clean(selected_dist)
-                    matched = [
-                        d for d in CACHED_DRIVERS 
-                        if d.get('districts') and target_clean in clean(d['districts'])
-                    ]
+                    if index < len(districts):
+                        selected_dist = districts[index]
+                        
+                        # --- بقية الكود كما هو ---
+                        await sync_all_users()
+                        def clean(t): return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا")
+                        target_clean = clean(selected_dist)
 
-                    if matched:
-                        kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched[:6]]
-                        await update.message.reply_text(
-                            f"✅ وجدنا كباتن في حي **{selected_dist}** بمكة:\nاختر الكابتن لبدء المحادثة:", 
-                            reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN
-                        )
-                    else:
-                        await update.message.reply_text(
-                            f"📍 حي {selected_dist} لا يوجد به كباتن حالياً، جرب الطلب العام.", 
-                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🌍 طلب عام", callback_data="order_general")]])
-                        )
+                        matched = [
+                            d for d in CACHED_DRIVERS 
+                            if d.get('districts') and target_clean in clean(d['districts'])
+                        ]
+                        
+                        # عرض النتائج
+                        if matched:
+                            kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched[:6]]
+                            await update.message.reply_text(
+                                f"✅ وجدنا كباتن في حي **{selected_dist}** ({city_key}):", 
+                                reply_markup=InlineKeyboardMarkup(kb), 
+                                parse_mode=ParseMode.MARKDOWN
+                            )
+                        else:
+                            await update.message.reply_text(f"📍 حي {selected_dist} ({city_key}) لا يوجد به كباتن حالياً.")
                 return 
             except Exception as e:
-                print(f"Error in sd_: {e}")
-
+                print(f"Error in deep link: {e}")
+        
         # --- حالة (order_): طلب كابتن محدد ---
         elif arg_value.startswith("order_"):
             target_id = arg_value.replace("order_", "")
@@ -531,11 +531,22 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     await query.answer()
 
-    # --- [1] قسم طلب الرحلات (للراكب) ---
-    
-    # أ- عرض قائمة الأحياء للراكب
     if data == "order_by_district":
-        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
+        keyboard = [
+            [InlineKeyboardButton("🕋 مكة المكرمة", callback_data="rider_city_مكة المكرمة")],
+            [InlineKeyboardButton("🌊 جدة", callback_data="rider_city_جدة")]
+        ]
+        await query.edit_message_text(
+            "📍 **تحديد الوجهة**\nاختر المدينة أولاً لعرض الأحياء المتاحة فيها:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+    # إضافة معالج جديد لاختيار أحياء المدينة المحددة
+    elif data.startswith("rider_city_"):
+        city_name = data.split("_")[2]
+        districts = CITIES_DISTRICTS.get(city_name, [])
+        
         keyboard = []
         for i in range(0, len(districts), 2):
             row = [InlineKeyboardButton(districts[i], callback_data=f"searchdist_{districts[i]}")]
@@ -543,52 +554,25 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 row.append(InlineKeyboardButton(districts[i+1], callback_data=f"searchdist_{districts[i+1]}"))
             keyboard.append(row)
         
+        keyboard.append([InlineKeyboardButton("🔙 رجوع للمدن", callback_data="order_by_district")])
+        
         await query.edit_message_text(
-            "📍 **أحياء مكة المكرمة**\nاختر الحي للبحث عن كباتن متوفرين فيه:",
+            f"📍 **أحياء {city_name}**\nاختر الحي للبحث عن كباتن:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.MARKDOWN
         )
 
-    # عند ضغط السائق على "حفظ وإنهاء"
-        # عند ضغط السائق على "حفظ وإنهاء"
-    elif data == "driver_home":
-        # 1. جلب بيانات السائق الحالية لعرض الأحياء التي تم حفظها (اختياري للتوثيق)
-        user_info = USER_CACHE.get(user_id, {})
-        saved_dists = user_info.get('districts', "لا توجد أحياء مختارة")
-        if not saved_dists: saved_dists = "لا توجد أحياء مختارة"
-        
-        # 2. تحويل الرسالة من "قائمة أزرار" إلى "نص تأكيدي" فقط (ستختفي الأزرار هنا)
-        confirm_text = (
-            "✅ **تم حفظ الأحياء بنجاح!**\n\n"
-            f"📍 نطاق عملك الحالي:\n_{saved_dists}_\n\n"
-            "يمكنك الآن استقبال الطلبات من الركاب في هذه المناطق."
-        )
-        
-        await query.edit_message_text(
-            text=confirm_text,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=None  # هذا السطر هو المسؤول عن إخفاء قائمة الأزرار تماماً
-        )
 
-        # 3. إرسال الكيبورد الرئيسي للسائق في رسالة جديدة لكي يتمكن من إكمال استخدامه للبوت
-        await context.bot.send_message(
-            chat_id=user_id,
-            text="الآن، يمكنك العودة لمهامك من القائمة أدناه:",
-            reply_markup=get_main_kb('driver', user_info.get('is_verified', True))
-        )
-
-    # --- [5] قسم قبول الرحلات (للسائق) ---
-    
-
-    # ب- معالجة اختيار حي معين والبحث عن كباتن
     elif data.startswith("searchdist_"):
         target_dist = data.split("_")[1]
-        await sync_all_users() # تحديث البيانات من القاعدة
+        await sync_all_users() 
         
-        def clean(t): return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا").strip()
+        def clean(t): 
+            return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").strip()
+        
         target_clean = clean(target_dist)
 
-        # البحث عن الكباتن الذين لديهم هذا الحي في ملفهم
+        # البحث في CACHED_DRIVERS عن أي كابتن يغطي هذا الحي
         matched = [
             d for d in CACHED_DRIVERS 
             if d.get('districts') and target_clean in clean(d['districts'])
@@ -599,6 +583,9 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for d in matched[:10]:
                 kb.append([InlineKeyboardButton(f"🚖 اطلب الكابتن {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")])
             
+            # إضافة زر رجوع ذكي يرجع المستخدم لآخر قائمة مدن (اختياري)
+            kb.append([InlineKeyboardButton("🔙 بحث في حي آخر", callback_data="order_by_district")])
+
             await query.edit_message_text(
                 f"✅ وجدنا كباتن في حي **{target_dist}**:\nاضغط على الكابتن لطلب المشوار:",
                 reply_markup=InlineKeyboardMarkup(kb),
@@ -606,14 +593,18 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await query.edit_message_text(
-                f"📍 لا يوجد كباتن مسجلين في حي **{target_dist}** حالياً.\nجرب الطلب عبر الموقع (GPS).",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🌍 طلب بالموقع", callback_data="order_general")]])
+                f"📍 لا يوجد كباتن مسجلين في حي **{target_dist}** حالياً.\nيمكنك تجربة الطلب العام ليصل لجميع الكباتن.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🌍 طلب عام (GPS)", callback_data="order_general")],
+                    [InlineKeyboardButton("🔙 رجوع", callback_data="order_by_district")]
+                ])
             )
+
 
     # --- [2] قسم إدارة الأحياء (للسائق) ---
     
     elif data == "manage_districts":
-        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
+        districts = CITIES_DISTRICTS.get("جدة", [])
         user_info = USER_CACHE.get(user_id, {})
         current_dists = user_info.get('districts', "") or ""
         
@@ -670,20 +661,17 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     elif data.startswith("toggle_"):
-        # مستوى الإزاحة هنا هو 8 مسافات (إذا كانت الدالة تبدأ بـ 0)
         dist_name = data.split("_")[1]
         
-        # 1. جلب البيانات من الكاش المحلي مع التحقق من وجود المستخدم
+        # 1. جلب البيانات من الكاش المحلي
         if user_id not in USER_CACHE:
             USER_CACHE[user_id] = {'districts': ""}
             
         user_info = USER_CACHE[user_id]
         current_str = user_info.get('districts', "") or ""
-        
-        # تحويل النص إلى قائمة
         current_list = [x.strip() for x in current_str.replace("،", ",").split(",") if x.strip()]
         
-        # 2. التبديل الفوري في الذاكرة
+        # 2. التبديل الفوري (إضافة أو إزالة)
         if dist_name in current_list:
             current_list.remove(dist_name)
             alert_msg = f"❌ تم إزالة {dist_name}"
@@ -695,8 +683,14 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_districts_str = ",".join(current_list)
         USER_CACHE[user_id]['districts'] = new_districts_str
 
-        # 4. بناء لوحة المفاتيح الجديدة
-        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
+        # 4. بناء لوحة المفاتيح الجديدة (تحديد المدينة تلقائياً)
+        current_city = "جدة" # الافتراضي
+        for city, dists in CITIES_DISTRICTS.items():
+            if dist_name in dists:
+                current_city = city
+                break
+
+        districts = CITIES_DISTRICTS.get(current_city, [])
         keyboard = []
         for i in range(0, len(districts), 2):
             row = []
@@ -704,11 +698,11 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 status = "✅ " if d in current_list else "❌ "
                 row.append(InlineKeyboardButton(f"{status}{d}", callback_data=f"toggle_{d}"))
             keyboard.append(row)
+        
         keyboard.append([InlineKeyboardButton("💾 حفظ وإنهاء", callback_data="driver_home")])
         
-        # 5. التحديث الآمن لواجهة المستخدم (التصحيح هنا)
+        # 5. التحديث الآمن لواجهة المستخدم
         try:
-            # استخدام query.message.edit_reply_markup بدلاً من query.edit_message_reply_markup
             await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
             await query.answer(alert_msg)
         except Exception as e:
@@ -716,7 +710,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print(f"UI Update Error: {e}")
                 await query.answer("تم التحديث")
 
-        # 6. التحديث في الخلفية
+        # 6. التحديث في الخلفية لقاعدة البيانات
         asyncio.create_task(update_districts_in_db(user_id, new_districts_str))
 
     # --- [3] قسم التسجيل (الذي كان لديك) ---
@@ -1718,7 +1712,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== دالة عرض الأحياء (محدثة) ====================
 
-async def show_districts_by_city(update: Update, context: ContextTypes.DEFAULT_TYPE, city_name: str = "مكة المكرمة", is_edit=False):
+async def show_districts_by_city(update: Update, context: ContextTypes.DEFAULT_TYPE, city_name: str = "جدة", is_edit=False):
     # تحديد المستخدم والكائن المستهدف
     if update.callback_query:
         user_id = update.callback_query.from_user.id
@@ -1789,6 +1783,70 @@ async def show_districts_by_city(update: Update, context: ContextTypes.DEFAULT_T
         if "Message is not modified" not in str(e):
             print(f"Error showing districts: {e}")
 
+async def show_districts_by_city(update: Update, context: ContextTypes.DEFAULT_TYPE, city_name: str = "جدة", is_edit=False):
+    # تحديد المستخدم والكائن المستهدف
+    if update.callback_query:
+        user_id = update.callback_query.from_user.id
+        target_msg = update.callback_query.message
+    else:
+        user_id = update.effective_user.id
+        target_msg = update.message
+
+    # 1. جلب البيانات (أولوية للكاش ثم قاعدة البيانات)
+    if user_id not in USER_CACHE:
+        conn = get_db_connection()
+        current_districts = ""
+        if conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT districts FROM users WHERE user_id = %s", (user_id,))
+                res = cur.fetchone()
+                if res and res[0]:
+                    current_districts = res[0]
+            conn.close()
+        USER_CACHE[user_id] = {'districts': current_districts}
+    
+    user_info = USER_CACHE.get(user_id, {})
+    current_str = user_info.get('districts', "") or ""
+    current_list = [d.strip() for d in current_str.replace("،", ",").split(",") if d.strip()]
+
+    # 2. بناء الأزرار (أيقونات ✅ و ❌)
+    all_districts = CITIES_DISTRICTS.get(city_name, [])
+    keyboard = []
+    
+    for i in range(0, len(all_districts), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(all_districts):
+                d_name = all_districts[i + j]
+                status = "✅ " if d_name in current_list else "❌ "
+                row.append(InlineKeyboardButton(f"{status}{d_name}", callback_data=f"toggle_{d_name}"))
+        keyboard.append(row)
+
+    # 3. إضافة أزرار التحكم (الرجوع والحفظ)
+    keyboard.append([InlineKeyboardButton("🔙 العودة لاختيار المدينة", callback_data="districts_settings")])
+    keyboard.append([InlineKeyboardButton("💾 حفظ وإنهاء الإعدادات", callback_data="driver_home")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    text_msg = (
+        f"🏙 **إدارة أحياء {city_name}**\n\n"
+        "اضغط على الحي لتغيير حالته:\n"
+        "✅ = مفعل (تصلك تنبيهات منه)\n"
+        "❌ = غير مفعل"
+    )
+
+    # 4. التنفيذ الآمن
+    try:
+        if is_edit and target_msg:
+            await target_msg.edit_text(text=text_msg, reply_markup=reply_markup, parse_mode="Markdown")
+        else:
+            if update.callback_query:
+                await update.callback_query.message.reply_text(text_msg, reply_markup=reply_markup, parse_mode="Markdown")
+            else:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=text_msg, reply_markup=reply_markup, parse_mode="Markdown")
+    except Exception as e:
+        if "Message is not modified" not in str(e):
+            print(f"Error showing districts: {e}")
 
 # ==================== معالج الأزرار الشامل (محدث) ====================
 
@@ -1802,8 +1860,8 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: pass
 
     if data == "districts_settings":
-        # عرض أحياء مكة المكرمة للسائق فوراً
-        from_city = "مكة المكرمة"
+        # عرض أحياء جدة للسائق فوراً
+        from_city = "جدة"
         await show_districts_by_city(update, context, from_city)
         return
 
@@ -2083,76 +2141,75 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- قسم الراكب: عرض الأحياء ---
         # 1. عند الضغط على زر "طلب رحلة بالاحياء"
-    elif data == "order_by_district":
-        # جلب قائمة الأحياء
-        districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
-        if not districts:
-            await query.answer("⚠️ قائمة الأحياء غير متوفرة حالياً.")
-            return
-
-        keyboard = []
-        # بناء أزرار الأحياء (صفين في كل سطر)
-        for i in range(0, len(districts), 2):
-            row = []
-            dist1 = districts[i]
-            # نستخدم بادئة searchdist_ التي يعالجها البوت
-            row.append(InlineKeyboardButton(dist1, callback_data=f"searchdist_{dist1}"))
-            if i + 1 < len(districts):
-                dist2 = districts[i+1]
-                row.append(InlineKeyboardButton(dist2, callback_data=f"searchdist_{dist2}"))
-            keyboard.append(row)
-
-        keyboard.append([InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="main_menu")])
-        
+    if data == "order_by_district":
+        keyboard = [
+            [InlineKeyboardButton("🕋 مكة المكرمة", callback_data="rider_city_مكة المكرمة")],
+            [InlineKeyboardButton("🌊 جدة", callback_data="rider_city_جدة")]
+        ]
         await query.edit_message_text(
-            "📍 **أحياء مكة المكرمة:**\nاختر الحي الذي تود البحث فيه عن كابتن:",
+            "📍 **تحديد الوجهة**\nاختر المدينة أولاً لعرض الأحياء المتاحة فيها:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.MARKDOWN
         )
-        return
+
+    # إضافة معالج جديد لاختيار أحياء المدينة المحددة
+    elif data.startswith("rider_city_"):
+        city_name = data.split("_")[2]
+        districts = CITIES_DISTRICTS.get(city_name, [])
+        
+        keyboard = []
+        for i in range(0, len(districts), 2):
+            row = [InlineKeyboardButton(districts[i], callback_data=f"searchdist_{districts[i]}")]
+            if i + 1 < len(districts):
+                row.append(InlineKeyboardButton(districts[i+1], callback_data=f"searchdist_{districts[i+1]}"))
+            keyboard.append(row)
+        
+        keyboard.append([InlineKeyboardButton("🔙 رجوع للمدن", callback_data="order_by_district")])
+        
+        await query.edit_message_text(
+            f"📍 **أحياء {city_name}**\nاختر الحي للبحث عن كباتن:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
 
     # 2. عند اختيار حي محدد للبحث عن كابتن
     elif data.startswith("searchdist_"):
-        # استخراج اسم الحي من الـ callback
-        target_dist = data.replace("searchdist_", "")
-        
-        await sync_all_users() # تحديث قائمة الكباتن من القاعدة
+        target_dist = data.split("_")[1]
+        await sync_all_users() 
         
         def clean(t): 
-            return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا").replace(" ", "").strip()
+            return t.replace("ة", "ه").replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").strip()
         
         target_clean = clean(target_dist)
-        matched_drivers = []
 
-        # البحث عن الكباتن الذين لديهم هذا الحي
-        for d in CACHED_DRIVERS:
-            if d.get('role') == 'driver' and d.get('districts'):
-                # تنظيف وتحويل النص المخزن (الذي يحتوي فواصل) إلى قائمة
-                d_dists = [clean(x) for x in d['districts'].replace("،", ",").split(",")]
-                if target_clean in d_dists:
-                    matched_drivers.append(d)
+        # البحث في CACHED_DRIVERS عن أي كابتن يغطي هذا الحي
+        matched = [
+            d for d in CACHED_DRIVERS 
+            if d.get('districts') and target_clean in clean(d['districts'])
+        ]
 
-        if not matched_drivers:
-            kb = [[InlineKeyboardButton("🌍 طلب GPS (بالموقع)", callback_data="order_general")],
-                  [InlineKeyboardButton("🔙 اختيار حي آخر", callback_data="order_by_district")]]
+        if matched:
+            kb = []
+            for d in matched[:10]:
+                kb.append([InlineKeyboardButton(f"🚖 اطلب الكابتن {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")])
+            
+            # إضافة زر رجوع ذكي يرجع المستخدم لآخر قائمة مدن (اختياري)
+            kb.append([InlineKeyboardButton("🔙 بحث في حي آخر", callback_data="order_by_district")])
+
             await query.edit_message_text(
-                f"⚠️ نعتذر، لا يوجد كباتن نخبة متاحين حالياً في حي **{target_dist}**.",
-                reply_markup=InlineKeyboardMarkup(kb)
+                f"✅ وجدنا كباتن في حي **{target_dist}**:\nاضغط على الكابتن لطلب المشوار:",
+                reply_markup=InlineKeyboardMarkup(kb),
+                parse_mode=ParseMode.MARKDOWN
             )
         else:
-            keyboard = []
-            for d in matched_drivers[:8]:
-                keyboard.append([InlineKeyboardButton(
-                    f"🚖 {d['name']} ({d.get('car_info', 'سيارة')})", 
-                    callback_data=f"book_{d['user_id']}_{target_dist}"
-                )])
-            keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="order_by_district")])
-            
             await query.edit_message_text(
-                f"✅ وجدنا {len(matched_drivers)} كابتن متاحين في {target_dist}:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
+                f"📍 لا يوجد كباتن مسجلين في حي **{target_dist}** حالياً.\nيمكنك تجربة الطلب العام ليصل لجميع الكباتن.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🌍 طلب عام (GPS)", callback_data="order_general")],
+                    [InlineKeyboardButton("🔙 رجوع", callback_data="order_by_district")]
+                ])
             )
-        return
+
 
     # ===============================================================
     # [C] عمليات الحجز والقبول (Logic)
@@ -2172,14 +2229,14 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # --- خيار ب: كابتن نخبة (بحث باختيار مكة المكرمة والحي) ---
+    # --- خيار ب: كابتن نخبة (بحث باختيار جدة والحي) ---
     
 
     # ===============================================================
     # 2. التنقل داخل قائمة المدن والأحياء
     # ===============================================================
 
-    # --- تم اختيار مكة المكرمة -> عرض الأحياء ---
+    # --- تم اختيار جدة -> عرض الأحياء ---
     
 
     # --- تم اختيار الحي -> عرض الكباتن ---
@@ -2555,8 +2612,18 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def districts_settings_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # بدلاً من بناء قائمة المدن، ننتقل مباشرة لعرض أحياء مكة المكرمة
-    await show_districts_by_city(update, context, "مكة المكرمة")
+    # بدلاً من عرض جدة فوراً، نعرض قائمة المدن
+    keyboard = [
+        [InlineKeyboardButton("🕋 مكة المكرمة", callback_data="settings_city_مكة المكرمة")],
+        [InlineKeyboardButton("🌊 جدة", callback_data="settings_city_جدة")]
+    ]
+    
+    text = "⚙️ **إعدادات الأحياء:**\nاختر المدينة التي تريد تعديل أحيائها:"
+    
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    else:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 
 # --- أوامر الأدمن ---
@@ -2718,18 +2785,21 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     user = update.effective_user
     text = update.message.text
-    # توحيد الحروف للبحث الذكي (Normalization)
+    
+    # --- دالة توحيد الحروف (تنظيف النص) ---
     def clean_text(t):
-        return t.lower().replace("ة", "ه").replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
+        return t.lower().replace("ة", "ه").replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").strip()
 
     msg_clean = clean_text(text)
 
-    # 1. نظام الطلبات الشهرية (البقاء على النظام السابق)
-    FORBIDDEN = ["شهري", "عقد", "راتب", "دوام", "استجار"]
+    # =================================================
+    # 1. نظام الحماية والطلبات الشهرية (كما هو)
+    # =================================================
+    FORBIDDEN = ["شهري", "عقد", "راتب", "دوام", "استجار", "توصيل طالبات"]
     if any(k in msg_clean for k in FORBIDDEN):
         contact_url = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
         admin_info = (
-            f"📋 **طلب شهري محول للأدمن**\n"
+            f"📋 **طلب شهري/عقد محول للأدمن**\n"
             f"━━━━━━━━━━━━━━━\n"
             f"👤 **الاسم:** {user.full_name}\n"
             f"💬 **الطلب:**\n_{text}_"
@@ -2741,53 +2811,67 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await context.bot.send_message(chat_id=admin_id, text=admin_info, reply_markup=admin_kb, parse_mode="Markdown")
             except: pass
 
-        await update.message.reply_text(f"✅ أبشر يا {user.first_name}، تم تحويل طلبك للقسم المختص وسيتم التواصل معك.")
+        await update.message.reply_text(f"✅ أبشر يا {user.first_name}، تم تحويل طلبك للقسم المختص (التعاقدات) وسيتم التواصل معك.")
         try: await update.message.delete()
         except: pass
         return
 
-    # 2. محاولة استخراج اسم الحي من مكة المكرمة
+    # =================================================
+    # 2. البحث الذكي عن الحي والمدينة (جدة أو مكة)
+    # =================================================
     found_dist = None
-    # تأكد من أن مفتاح القاموس مطابق تماماً لما عرفته سابقاً (مكة المكرمة)
-    districts_list = CITIES_DISTRICTS.get("مكة المكرمة", [])
-    
-    for dist in districts_list:
-        if clean_text(dist) in msg_clean:
-            found_dist = dist
-            break
+    found_city = None
 
-    # 3. معالجة النتائج بناءً على وجود الحي
+    # نفترض أن CITIES_DISTRICTS معرفة خارج الدالة وتحتوي على مفاتيح "مكة المكرمة" و "جدة"
+    for city, districts in CITIES_DISTRICTS.items():
+        for dist in districts:
+            if clean_text(dist) in msg_clean:
+                found_dist = dist
+                found_city = city
+                break # وجدنا الحي، نخرج من حلقة الأحياء
+        if found_dist:
+            break # وجدنا المدينة، نخرج من حلقة المدن
+
+    # =================================================
+    # 3. معالجة النتائج (إذا وجد الحي)
+    # =================================================
     if found_dist:
-        # أ) وجد حي في الرسالة -> ابحث عن الكباتن
+        # تحديث الكاش لضمان جلب أحدث الكباتن
         await sync_all_users()
-        # فحص الكباتن الذين لديهم هذا الحي في بياناتهم
+        
+        # البحث عن الكباتن الذين يغطون هذا الحي
         matched_drivers = [
             d for d in CACHED_DRIVERS 
             if d.get('districts') and clean_text(found_dist) in clean_text(d['districts'])
         ]
 
         if matched_drivers:
-            # عرض الكباتن المتوفرين في هذا الحي
-            kb = [[InlineKeyboardButton(f"🚖 اطلب الكابتن {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched_drivers[:6]]
+            # عرض الكباتن المتاحين
+            kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched_drivers[:6]]
+            
             await update.message.reply_text(
-                f"✅ أبشر يا {user.first_name}، وجدنا كباتن متاحين في حي **{found_dist}** بمكة:\nاضغط على اسم الكابتن لطلبه:",
+                f"✅ أبشر يا {user.first_name}، وجدنا كباتن في حي **{found_dist}** ({found_city}):\nاضغط على اسم الكابتن للتواصل:",
                 reply_markup=InlineKeyboardMarkup(kb),
                 parse_mode="Markdown"
             )
             return
         else:
-            # وجد الحي ولكن لا يوجد كباتن مسجلين فيه حالياً
+            # الحي موجود لكن لا يوجد كباتن حالياً
             await update.message.reply_text(
-                f"📍 حي **{found_dist}**: لا يوجد كباتن متاحين في هذا الحي حالياً.\nيمكنك طلب مشوار عام ليصل لجميع الكباتن في مكة:",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🌍 طلب مشوار عام (GPS)", url=f"https://t.me/{context.bot.username}?start=order_general")]])
+                f"📍 حي **{found_dist}** ({found_city}):\nحالياً لا يوجد كباتن مسجلين في هذا الحي، لكن يمكنك طلب **أقرب كابتن لك** عبر الزر:",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"🌍 طلب GPS في {found_city}", url=f"https://t.me/{context.bot.username}?start=order_general")]])
             )
             return
 
-    # 4. فحص إذا كان هناك نية طلب (عشان ما يرد على كل كلمة مجهولة)
-    KEYWORDS_INTENT = ["مشوار", "توصيل", "سواق", "كابتن", "سياره", "ابي", "بغيت", "وصلني"]
+    # =================================================
+    # 4. إذا لم يحدد الحي، فحص "نية الطلب"
+    # =================================================
+    # كلمات تدل أن الشخص يريد مشواراً وليس مجرد سوالف
+    KEYWORDS_INTENT = ["مشوار", "توصيل", "سواق", "كابتن", "سياره", "ابي", "بغيت", "وصلني", "بكم", "موجود", "فاضي"]
     is_order_intent = any(k in msg_clean for k in KEYWORDS_INTENT)
 
     if is_order_intent:
+        # رسالة ترحيبية عامة توجهه لاستخدام الروابط الصحيحة
         welcome_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("📍 طلب مشوار (GPS) 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
             [InlineKeyboardButton("🚕 تسجيل كابتن جديد", url=f"https://t.me/{context.bot.username}?start=driver_reg")],
@@ -2795,13 +2879,15 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
         ])
         
         await update.message.reply_text(
-            f"يا هلا بك يا {user.first_name} في **مشاوير مكة** 🕋\n\n"
-            "لم يتم التعرف على الحي، يرجى كتابة **اسم الحي بمكة** (مثل: الشوقية) أو اطلب عبر الخريطة:",
+            f"يا هلا بك يا {user.first_name} في **مشاوير جدة ومكة** 🕋🌊\n\n"
+            "لم يتم التعرف على الحي، يرجى كتابة **اسم الحي** (مثل: الشوقية أو التحلية) أو اطلب عبر الخريطة:",
             reply_markup=welcome_kb,
             parse_mode="Markdown"
         )
-    # إذا لم تكن نية طلب ولا اسم حي، البوت سيسكت تماماً ولن يرد (لتجنب الإزعاج)
+    
+    # إذا لم تكن هناك نية طلب ولا اسم حي، لا نرد (تجاهل)
     return
+
 
 
 async def handle_chat_proxy(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3047,25 +3133,52 @@ async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def group_districts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
-    if not districts: return
-
-    keyboard = []
-    # توزيع الأحياء في صفوف (3 أحياء في كل صف لتوفير المساحة في القروب)
-    for i in range(0, len(districts), 3):
-        row = [InlineKeyboardButton(districts[i], url=f"https://t.me/{context.bot.username}?start=sd_{i}")]
-        if i + 1 < len(districts):
-            row.append(InlineKeyboardButton(districts[i+1], url=f"https://t.me/{context.bot.username}?start=sd_{i+1}"))
-        if i + 2 < len(districts):
-            row.append(InlineKeyboardButton(districts[i+2], url=f"https://t.me/{context.bot.username}?start=sd_{i+2}"))
-        keyboard.append(row)
+    # إنشاء أزرار لاختيار المدينة أولاً داخل القروب
+    keyboard = [
+        [
+            InlineKeyboardButton("🕋 أحياء مكة المكرمة", callback_data="grp_show_مكة المكرمة"),
+            InlineKeyboardButton("🌊 أحياء جدة", callback_data="grp_show_جدة")
+        ]
+    ]
 
     await update.message.reply_text(
-        "📍 **أحياء مكة المكرمة المتاحة:**\nإضغط على الحي لعرض الكباتن المتوفرين والطلب مباشرة عبر الخاص 👇",
+        "📍 **خدمة البحث عن كابتن حسب الحي**\n"
+        "يرجى اختيار المدينة لعرض الأحياء المتاحة:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN
     )
+
+# دالة معالجة ضغطة زر المدينة في القروب (تُستدعى من handle_callbacks)
+async def show_group_districts_by_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    city_name = query.data.replace("grp_show_", "")
+    districts = CITIES_DISTRICTS.get(city_name, [])
     
+    if not districts:
+        await query.answer("⚠️ لا توجد أحياء مسجلة لهذه المدينة.")
+        return
+
+    keyboard = []
+    # توزيع الأحياء في صفوف (3 أحياء في كل صف) مع رابط يحتوي على اسم المدينة
+    for i in range(0, len(districts), 3):
+        row = []
+        for j in range(3):
+            if i + j < len(districts):
+                dist_name = districts[i + j]
+                # الرابط بصيغة: sd_المدينة_الرقم
+                link = f"https://t.me/{context.bot.username}?start=sd_{city_name}_{i+j}"
+                row.append(InlineKeyboardButton(dist_name, url=link))
+        keyboard.append(row)
+
+    # زر للرجوع لاختيار مدينة أخرى
+    keyboard.append([InlineKeyboardButton("🔙 العودة لاختيار المدينة", callback_data="back_to_cities_grp")])
+
+    await query.edit_message_text(
+        f"📍 **أحياء {city_name} المتاحة:**\n"
+        "إضغط على الحي لعرض الكباتن المتوفرين والطلب عبر الخاص 👇",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN
+    )
 
     
 async def admin_list_users(update, context, page=0):
