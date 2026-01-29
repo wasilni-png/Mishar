@@ -2783,20 +2783,26 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
 
-    # 4. إذا لم يجد اسماً للحي (أو رسالة ترحيبية عامة)
-    # الرد بالرسالة الترحيبية المعتادة مع أزرار التسجيل
-    welcome_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📍 طلب مشوار (GPS) 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
-        [InlineKeyboardButton("🚕 تسجيل كابتن جديد", url=f"https://t.me/{context.bot.username}?start=driver_reg")],
-        [InlineKeyboardButton("👤 تسجيل راكب", url=f"https://t.me/{context.bot.username}?start=reg_rider")]
-    ])
-    
-    await update.message.reply_text(
-        f"مرحباً بك يا {user.first_name} في **بوت مشاوير مكة** 🕋\n\n"
-        "لطلب مشوار، اكتب **اسم الحي** في مكة المكرمة مباشرة، أو استخدم الأزرار أدناه:",
-        reply_markup=welcome_kb,
-        parse_mode="Markdown"
-    )
+    # 4. فحص إذا كان هناك نية طلب (عشان ما يرد على كل كلمة مجهولة)
+    KEYWORDS_INTENT = ["مشوار", "توصيل", "سواق", "كابتن", "سياره", "ابي", "بغيت", "وصلني"]
+    is_order_intent = any(k in msg_clean for k in KEYWORDS_INTENT)
+
+    if is_order_intent:
+        welcome_kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📍 طلب مشوار (GPS) 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
+            [InlineKeyboardButton("🚕 تسجيل كابتن جديد", url=f"https://t.me/{context.bot.username}?start=driver_reg")],
+            [InlineKeyboardButton("👤 تسجيل راكب", url=f"https://t.me/{context.bot.username}?start=reg_rider")]
+        ])
+        
+        await update.message.reply_text(
+            f"يا هلا بك يا {user.first_name} في **مشاوير مكة** 🕋\n\n"
+            "لم يتم التعرف على الحي، يرجى كتابة **اسم الحي بمكة** (مثل: الشوقية) أو اطلب عبر الخريطة:",
+            reply_markup=welcome_kb,
+            parse_mode="Markdown"
+        )
+    # إذا لم تكن نية طلب ولا اسم حي، البوت سيسكت تماماً ولن يرد (لتجنب الإزعاج)
+    return
+
 
 async def handle_chat_proxy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1. حماية: نتجاهل أي تحديث ليس رسالة (تجاهل ضغطات الأزرار CallbackQueries)
