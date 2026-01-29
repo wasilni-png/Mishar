@@ -455,7 +455,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if arg_value.startswith("sd_"):
             try:
                 index = int(arg_value.split("_")[1])
-                districts = CITIES_DISTRICTS.get("المدينة المنورة", [])
+                districts = CITIES_DISTRICTS.get("مكة المكرمة", [])
                 
                 if index < len(districts):
                     selected_dist = districts[index]
