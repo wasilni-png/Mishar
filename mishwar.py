@@ -2924,7 +2924,7 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
             user_cooldowns[user_id] = now
             welcome_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("📍 طلب عبر الخريطة 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
-                [InlineKeyboardButton("📋 اختيار الحي يدوياً", url=f"https://t.me/{context.bot.username}?start=browse_districts")]
+               [InlineKeyboardButton("🚕 تسجيل كابتن جديد", url=f"https://t.me/{context.bot.username}?start=driver_reg")]
             ])
             await update.message.reply_text(
                 f"هلا بك {user.first_name}، إذا كنت تبحث عن مشوار، حدد الحي أو استخدم الخريطة:",
