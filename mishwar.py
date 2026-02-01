@@ -2852,26 +2852,7 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
     # =================================================
     # 1. نظام الحماية والطلبات الشهرية
     # =================================================
-    FORBIDDEN = ["شهري", "عقد", "راتب", "دوام", "استجار", "توصيل طالبات"]
-    if any(k in msg_clean for k in FORBIDDEN):
-        contact_url = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
-        admin_info = (
-            f"📋 **طلب شهري/عقد محول للأدمن**\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"👤 **الاسم:** {user.full_name}\n"
-            f"💬 **الطلب:**\n_{text}_"
-        )
-        admin_kb = InlineKeyboardMarkup([[InlineKeyboardButton("💬 مراسلة العضو", url=contact_url)]])
-
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_message(chat_id=admin_id, text=admin_info, reply_markup=admin_kb, parse_mode="Markdown")
-            except: pass
-
-        await update.message.reply_text(f"✅ أبشر يا {user.first_name}، تم تحويل طلبك للقسم المختص (التعاقدات) وسيتم التواصل معك.")
-        try: await update.message.delete()
-        except: pass
-        return
+    
     # =================================================
     # 2. البحث الذكي عن الحي والمدينة
     # =================================================
