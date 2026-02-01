@@ -2970,21 +2970,31 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     # حالة ب: نية طلب واضحة لكن لم يذكر الحي أو الحي غير مدرج
+        # =================================================
+    # 4. فحص نية الطلب العامة (عند ذكر كلمة مشوار)
+    # =================================================
     elif has_intent:
-        # لا نرد إلا إذا كانت الرسالة موجهة للبوت أو تحتوي كلمات قوية
-        if len(msg_clean) > 15: # لضمان أنها جملة طلب وليست مجرد كلمة
-            user_cooldowns[user_id] = now
-            welcome_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("📍 طلب عبر الخريطة 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
-               [InlineKeyboardButton("🚕 تسجيل كابتن جديد", url=f"https://t.me/{context.bot.username}?start=driver_reg")]
-            ])
-            await update.message.reply_text(
-                f"هلا بك {user.first_name}، إذا كنت تبحث عن مشوار، حدد الحي أو استخدم الخريطة:",
-                reply_markup=welcome_kb,
-                parse_mode="Markdown"
-            )
+        # نظام تبريد لمنع إغراق المجموعة بالرسائل الترحيبية
+        now = datetime.now()
+        if user_id in user_cooldowns and (now - user_cooldowns[user_id]) < timedelta(seconds=60):
+            return
 
-    return
+        user_cooldowns[user_id] = now
+        
+        # أزرار الوصول السريع
+        welcome_kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📍 اطلب مشوار عبر GPS 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
+            [InlineKeyboardButton("🚕 تسجيل كابتن جديد", url=f"https://t.me/{context.bot.username}?start=driver_reg")]
+        ])
+        
+        await update.message.reply_text(
+            f"يا هلا بك يا {user.first_name}.. أبشر بسعدك 🚕\n\n"
+            "إذا كنت تبحث عن توصيلة، يمكنك الطلب مباشرة عبر الخريطة (GPS) أو التسجيل معنا ككابتن عبر الأزرار التالية:",
+            reply_markup=welcome_kb,
+            parse_mode="Markdown"
+        )
+        return
+
 
 
 
