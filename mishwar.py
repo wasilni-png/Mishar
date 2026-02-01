@@ -2129,6 +2129,9 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # =================================================
     # نظام التسجيل الفوري (راكب) أو طلب الاسم (كابتن)
     # =================================================
+        # =================================================
+    # نظام معالجة أزرار التسجيل (تلقائي للراكب / يدوي للكابتن)
+    # =================================================
     elif data in ["reg_rider", "reg_driver"]:
         user = query.from_user
         role = "rider" if data == "reg_rider" else "driver"
@@ -2141,25 +2144,36 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "user_id": user.id,
                     "name": user.first_name,
                     "phone": "0000000000",
-                    "role": "rider"
+                    "role": "rider",
+                    "is_verified": True  # تفعيل تلقائي بما أنه راكب
                 }).execute()
                 
+                # تحديث الرسالة لتأكيد التسجيل
                 await query.edit_message_text(
-                    text=f"✅ **تم تسجيلك بنجاح يا {user.first_name}**\n\nيمكنك الآن البدء بطلب المشاوير مباشرة عبر الخريطة أو اختيار الحي.",
-                    parse_mode=ParseMode.MARKDOWN
+                    text=f"✅ **تم تسجيلك بنجاح يا {user.first_name}**\n\nأهلاً بك في عائلة مشاوير! يمكنك الآن استخدام كافة مميزات البوت مباشرة.",
+                    parse_mode="Markdown"
                 )
-                # إنهاء الحالة لأن التسجيل اكتمل
+                
+                # إظهار القائمة الرئيسية للراكب فوراً بعد التسجيل
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text="🏠 **القائمة الرئيسية للراكب**",
+                    reply_markup=get_main_kb("rider", True)
+                )
+                
+                # إنهاء أي حالة انتظار
                 context.user_data['state'] = None 
+
             except Exception as e:
                 print(f"Error in silent rider registration: {e}")
-                await query.answer("حدث خطأ أثناء التسجيل، يرجى المحاولة لاحقاً.", show_alert=True)
+                await query.answer("⚠️ حدث خطأ أثناء التسجيل السريع، يرجى المحاولة لاحقاً.", show_alert=True)
         
         else:
             # الكابتن يحتاج لبيانات حقيقية، لذا ننتقل لمرحلة طلب الاسم
             context.user_data['state'] = 'WAIT_NAME'
             await query.edit_message_text(
                 text="📝 يرجى كتابة **اسمك الثلاثي** للتسجيل ككابتن:", 
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode="Markdown"
             )
 
     elif data == "driver_home" or data == "main_menu":
