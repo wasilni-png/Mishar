@@ -2954,8 +2954,11 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
         # =================================================
     # 4. فحص نية الطلب العامة (عند ذكر كلمة مشوار)
     # =================================================
-    elif has_intent:
-        # نظام تبريد لمنع إغراق المجموعة بالرسائل الترحيبية
+        # =================================================
+    # الرد التلقائي عند كتابة كلمة "مشوار" فقط
+    # =================================================
+    elif msg_clean == "مشوار":
+        # نظام تبريد لمنع التكرار المزعج (60 ثانية)
         now = datetime.now()
         if user_id in user_cooldowns and (now - user_cooldowns[user_id]) < timedelta(seconds=60):
             return
@@ -2975,6 +2978,7 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode="Markdown"
         )
         return
+
 
 
 
