@@ -2815,21 +2815,42 @@ async def promote_to_delivery(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # الدالة الرئيسية لمسح الرسائل في القروب
+
+from datetime import datetime, timedelta
+
+# قاموس لتخزين وقت آخر طلب لكل مستخدم (لمنع التكرار المزعج)
+user_cooldowns = {}
+
 async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
     user = update.effective_user
     text = update.message.text
+    user_id = user.id
+
+    # --- 1. نظام منع التكرار (Cooldown) ---
+    # يمنع المستخدم من تفعيل البوت أكثر من مرة كل 30 ثانية في المجموعات
+    now = datetime.now()
+    if user_id in user_cooldowns and (now - user_cooldowns[user_id]) < timedelta(seconds=30):
+        return
     
-    # --- دالة توحيد الحروف (تنظيف النص) ---
     def clean_text(t):
         return t.lower().replace("ة", "ه").replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").strip()
 
     msg_clean = clean_text(text)
 
+    # --- 2. فلتر الجدية (طول النص) ---
+    # إذا كانت الرسالة أقل من 7 حروف غالباً ليست طلباً جاداً (مثل كلمة "حي" فقط)
+    if len(msg_clean) < 7:
+        return
+
+    # --- 3. الكلمات الدلالية للنية ---
+    KEYWORDS_INTENT = ["مشوار", "توصيل", "سواق", "كابتن", "سياره", "ابي", "بغيت", "وصلني", "بكم", "موجود", "فاضي", "رايح"]
+    has_intent = any(k in msg_clean for k in KEYWORDS_INTENT)
+
     # =================================================
-    # 1. نظام الحماية والطلبات الشهرية (كما هو)
+    # 1. نظام الحماية والطلبات الشهرية
     # =================================================
     FORBIDDEN = ["شهري", "عقد", "راتب", "دوام", "استجار", "توصيل طالبات"]
     if any(k in msg_clean for k in FORBIDDEN):
@@ -2851,77 +2872,66 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
         try: await update.message.delete()
         except: pass
         return
-
     # =================================================
-    # 2. البحث الذكي عن الحي والمدينة (جدة أو مكة)
+    # 2. البحث الذكي عن الحي والمدينة
     # =================================================
     found_dist = None
     found_city = None
 
-    # نفترض أن CITIES_DISTRICTS معرفة خارج الدالة وتحتوي على مفاتيح "مكة المكرمة" و "جدة"
     for city, districts in CITIES_DISTRICTS.items():
         for dist in districts:
-            if clean_text(dist) in msg_clean:
+            cleaned_dist = clean_text(dist)
+            # شرط صارم: يجب أن يكون اسم الحي كلمة مستقلة وليس جزءاً من كلمة أخرى
+            if f" {cleaned_dist} " in f" {msg_clean} ":
                 found_dist = dist
                 found_city = city
-                break # وجدنا الحي، نخرج من حلقة الأحياء
-        if found_dist:
-            break # وجدنا المدينة، نخرج من حلقة المدن
+                break
+        if found_dist: break
 
     # =================================================
-    # 3. معالجة النتائج (إذا وجد الحي)
+    # 3. معالجة النتائج (ذكاء الرد)
     # =================================================
-    if found_dist:
-        # تحديث الكاش لضمان جلب أحدث الكباتن
+    
+    # حالة أ: وجدنا حي + نية طلب (أعلى درجات التأكد)
+    if found_dist and has_intent:
+        user_cooldowns[user_id] = now # تفعيل التبريد
         await sync_all_users()
         
-        # البحث عن الكباتن الذين يغطون هذا الحي
         matched_drivers = [
             d for d in CACHED_DRIVERS 
             if d.get('districts') and clean_text(found_dist) in clean_text(d['districts'])
         ]
 
         if matched_drivers:
-            # عرض الكباتن المتاحين
             kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched_drivers[:6]]
-            
             await update.message.reply_text(
-                f"✅ أبشر يا {user.first_name}، وجدنا كباتن في حي **{found_dist}** ({found_city}):\nاضغط على اسم الكابتن للتواصل:",
+                f"✅ أبشر يا {user.first_name}، وجدنا كباتن في حي **{found_dist}**:\nاضغط على اسم الكابتن للتواصل المباشر:",
                 reply_markup=InlineKeyboardMarkup(kb),
                 parse_mode="Markdown"
             )
-            return
         else:
-            # الحي موجود لكن لا يوجد كباتن حالياً
             await update.message.reply_text(
-                f"📍 حي **{found_dist}** ({found_city}):\nحالياً لا يوجد كباتن مسجلين في هذا الحي، لكن يمكنك طلب **أقرب كابتن لك** عبر الزر:",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"🌍 طلب GPS في {found_city}", url=f"https://t.me/{context.bot.username}?start=order_general")]])
+                f"📍 حي **{found_dist}** ({found_city}):\nلا يوجد كباتن مسجلين بالحي حالياً، اطلب كابتن عبر الخريطة:",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"🌍 طلب أقرب كابتن (GPS)", url=f"https://t.me/{context.bot.username}?start=order_general")]]),
+                parse_mode="Markdown"
             )
-            return
+        return
 
-    # =================================================
-    # 4. إذا لم يحدد الحي، فحص "نية الطلب"
-    # =================================================
-    # كلمات تدل أن الشخص يريد مشواراً وليس مجرد سوالف
-    KEYWORDS_INTENT = ["مشوار", "توصيل", "سواق", "كابتن", "سياره", "ابي", "بغيت", "وصلني", "بكم", "موجود", "فاضي"]
-    is_order_intent = any(k in msg_clean for k in KEYWORDS_INTENT)
+    # حالة ب: نية طلب واضحة لكن لم يذكر الحي أو الحي غير مدرج
+    elif has_intent:
+        # لا نرد إلا إذا كانت الرسالة موجهة للبوت أو تحتوي كلمات قوية
+        if len(msg_clean) > 15: # لضمان أنها جملة طلب وليست مجرد كلمة
+            user_cooldowns[user_id] = now
+            welcome_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📍 طلب عبر الخريطة 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
+                [InlineKeyboardButton("📋 اختيار الحي يدوياً", url=f"https://t.me/{context.bot.username}?start=browse_districts")]
+            ])
+            await update.message.reply_text(
+                f"هلا بك {user.first_name}، إذا كنت تبحث عن مشوار، حدد الحي أو استخدم الخريطة:",
+                reply_markup=welcome_kb,
+                parse_mode="Markdown"
+            )
 
-    if is_order_intent:
-        # رسالة ترحيبية عامة توجهه لاستخدام الروابط الصحيحة
-        welcome_kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📍 طلب مشوار (GPS) 📍", url=f"https://t.me/{context.bot.username}?start=order_general")],
-            [InlineKeyboardButton("🚕 تسجيل كابتن جديد", url=f"https://t.me/{context.bot.username}?start=driver_reg")],
-            [InlineKeyboardButton("👤 تسجيل راكب", url=f"https://t.me/{context.bot.username}?start=reg_rider")]
-        ])
-        
-        await update.message.reply_text(
-            f"يا هلا بك يا {user.first_name} في **مشاوير جدة ومكة** 🕋🌊\n\n"
-            "لم يتم التعرف على الحي، يرجى كتابة **اسم الحي** (مثل: الشوقية أو التحلية) أو اطلب عبر الخريطة:",
-            reply_markup=welcome_kb,
-            parse_mode="Markdown"
-        )
-    
-    # إذا لم تكن هناك نية طلب ولا اسم حي، لا نرد (تجاهل)
     return
 
 
