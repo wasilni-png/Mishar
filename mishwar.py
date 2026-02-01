@@ -2926,8 +2926,11 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
     # =================================================
     
     # حالة أ: وجدنا حي + نية طلب (أعلى درجات التأكد)
+        # =================================================
+    # حالة أ: وجدنا حي + نية طلب (إرسال للكباتن والراكب)
+    # =================================================
     if found_dist and has_intent:
-        user_cooldowns[user_id] = now # تفعيل التبريد
+        user_cooldowns[user_id] = now  # تفعيل التبريد
         await sync_all_users()
         
         matched_drivers = [
@@ -2936,13 +2939,46 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
         ]
 
         if matched_drivers:
-            kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in matched_drivers[:6]]
+            # 1. تجهيز قائمة الأزرار للراكب (أول 6 كباتن)
+            drivers_to_show = matched_drivers[:6]
+            kb = [[InlineKeyboardButton(f"🚖 اطلب {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")] for d in drivers_to_show]
+            
             await update.message.reply_text(
                 f"✅ أبشر يا {user.first_name}، وجدنا كباتن في حي **{found_dist}**:\nاضغط على اسم الكابتن للتواصل المباشر:",
                 reply_markup=InlineKeyboardMarkup(kb),
                 parse_mode="Markdown"
             )
+            # 2. إرسال إشعارات خاصة للكباتن المتاحين
+            # إنشاء رابط التواصل مع العميل (إذا كان لديه يوزر نيم أو عبر الآيدي)
+            client_url = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
+            
+            driver_msg = (
+                f"🔔 **تنبيه طلب جديد!**\n\n"
+                f"📍 يوجد عميل يبحث عن مشوار في حي: **{found_dist}**\n"
+                f"👤 العميل: {user.full_name}\n"
+                f"💬 نص الطلب: {text}\n\n"
+                f"🚀 يمكنك مراسلة العميل الآن عبر الزر أدناه:"
+            )
+            
+            # إنشاء زر المراسلة
+            driver_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💬 مراسلة العميل", url=client_url)]
+            ])
+            
+            for d in drivers_to_show:
+                try:
+                    await context.bot.send_message(
+                        chat_id=d['user_id'], 
+                        text=driver_msg, 
+                        reply_markup=driver_kb,
+                        parse_mode="Markdown"
+                    )
+                except:
+                    # في حال قام الكابتن بحظر البوت
+                    pass
+
         else:
+            # في حال لم يتم العثور على كباتن
             await update.message.reply_text(
                 f"📍 حي **{found_dist}** ({found_city}):\nلا يوجد كباتن مسجلين بالحي حالياً، اطلب كابتن عبر الخريطة:",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"🌍 طلب أقرب كابتن (GPS)", url=f"https://t.me/{context.bot.username}?start=order_general")]]),
