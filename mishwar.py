@@ -486,21 +486,52 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print(f"Error in deep link sd_: {e}")
         
         # --- حالة (order_): طلب كابتن محدد ---
+            # =================================================
+    # نظام الطلب المباشر والتسجيل التلقائي للركاب
+    # =================================================
+            # =================================================
+        # نظام الطلب المباشر والتسجيل التلقائي للركاب
+        # =================================================
         elif arg_value.startswith("order_"):
-            target_id = arg_value.replace("order_", "")
-            
-            if not has_phone:
-                context.user_data.update({'state': 'WAIT_RIDER_PHONE', 'temp_name': first_name, 'pending_order_driver': target_id})
-                await update.message.reply_text(f"👋 أهلاً بك!\nلإتمام طلبك، يرجى كتابة **رقم جوالك** أولاً:")
-                return
+                target_id = arg_value.replace("order_", "")
+                
+                # 1. فحص التسجيل: إذا لم يكن لديه هاتف، نسجله فوراً ببيانات افتراضية
+                if not has_phone:
+                        try:
+                                # إعداد البيانات لتتوافق مع أعمدة Supabase
+                                rider_payload = {
+                                        "user_id": user_id,
+                                        "name": first_name,      # اسم المستخدم من تليجرام
+                                        "phone": "0000000000",   # رقم افتراضي لتغطية العمود
+                                        "role": "rider"
+                                }
+                                
+                                # تنفيذ الإدراج في قاعدة البيانات
+                                supabase.table("users").upsert(rider_payload).execute()
+                                
+                                # تحديث المتغير محلياً للاستمرار في العملية
+                                has_phone = True
+                        except Exception as e:
+                                print(f"Error Auto-Reg: {e}")
 
-            context.user_data.update({'driver_to_order': target_id, 'state': 'WAIT_TRIP_DETAILS'})
-            await update.message.reply_text(
-                f"📝 **يا هلا بك يا {user['name']}**\nاكتب تفاصيل مشوارك الآن (الوجهة والوقت):",
-                reply_markup=ReplyKeyboardMarkup([[KeyboardButton("❌ إلغاء الطلب")]], resize_keyboard=True),
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return
+                # 2. تحديث حالة المستخدم لانتظار تفاصيل الرحلة
+                context.user_data.update({
+                        'driver_to_order': target_id, 
+                        'state': 'WAIT_TRIP_DETAILS'
+                })
+                
+                # 3. إرسال رسالة التوجيه للراكب
+                await update.message.reply_text(
+                        f"📝 **يا هلا بك يا {first_name}**\n"
+                        "لقد تم تفعيل حسابك كراكب تلقائياً.\n\n"
+                        "اكتب الآن **تفاصيل مشوارك** (الوجهة والوقت) في رسالة واحدة:",
+                        reply_markup=ReplyKeyboardMarkup(
+                                [[KeyboardButton("❌ إلغاء الطلب")]], 
+                                resize_keyboard=True
+                        ),
+                        parse_mode="Markdown"
+                )
+                return
 
         # --- حالات التسجيل ---
         elif arg_value in ["driver_reg", "reg_driver"]:
@@ -2095,20 +2126,41 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     # --- [3] قسم التسجيل (الذي كان لديك) ---
+        # =================================================
+    # نظام التسجيل الفوري (راكب) أو طلب الاسم (كابتن)
+    # =================================================
     elif data in ["reg_rider", "reg_driver"]:
-        user = query.from_user # التأكد من تعريف user
+        user = query.from_user
         role = "rider" if data == "reg_rider" else "driver"
         context.user_data['reg_role'] = role
         
         if role == "rider":
-            context.user_data['state'] = 'WAIT_RIDER_PHONE'
+            try:
+                # تسجيل الراكب تلقائياً ببيانات افتراضية لتغطية أعمدة Supabase
+                supabase.table("users").upsert({
+                    "user_id": user.id,
+                    "name": user.first_name,
+                    "phone": "0000000000",
+                    "role": "rider"
+                }).execute()
+                
+                await query.edit_message_text(
+                    text=f"✅ **تم تسجيلك بنجاح يا {user.first_name}**\n\nيمكنك الآن البدء بطلب المشاوير مباشرة عبر الخريطة أو اختيار الحي.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                # إنهاء الحالة لأن التسجيل اكتمل
+                context.user_data['state'] = None 
+            except Exception as e:
+                print(f"Error in silent rider registration: {e}")
+                await query.answer("حدث خطأ أثناء التسجيل، يرجى المحاولة لاحقاً.", show_alert=True)
+        
+        else:
+            # الكابتن يحتاج لبيانات حقيقية، لذا ننتقل لمرحلة طلب الاسم
+            context.user_data['state'] = 'WAIT_NAME'
             await query.edit_message_text(
-                text=f"🎉 **أهلاً بك يا {user.first_name}**\n\nمن فضلك أرسل **رقم جوالك** الآن بكتابته في الشات (مثال: 050xxxxxxx):",
+                text="📝 يرجى كتابة **اسمك الثلاثي** للتسجيل ككابتن:", 
                 parse_mode=ParseMode.MARKDOWN
             )
-        else:
-            context.user_data['state'] = 'WAIT_NAME'
-            await query.edit_message_text(text="📝 يرجى كتابة **اسمك الثلاثي** الآن:", parse_mode=ParseMode.MARKDOWN)
 
     elif data == "driver_home" or data == "main_menu":
         user_id = update.effective_user.id
@@ -2852,7 +2904,26 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
     # =================================================
     # 1. نظام الحماية والطلبات الشهرية
     # =================================================
-    
+    FORBIDDEN = ["شهري", "عقد", "راتب", "دوام", "استجار", "توصيل طالبات"]
+    if any(k in msg_clean for k in FORBIDDEN):
+        contact_url = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
+        admin_info = (
+            f"📋 **طلب شهري/عقد محول للأدمن**\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"👤 **الاسم:** {user.full_name}\n"
+            f"💬 **الطلب:**\n_{text}_"
+        )
+        admin_kb = InlineKeyboardMarkup([[InlineKeyboardButton("💬 مراسلة العضو", url=contact_url)]])
+
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(chat_id=admin_id, text=admin_info, reply_markup=admin_kb, parse_mode="Markdown")
+            except: pass
+
+        await update.message.reply_text(f"✅ أبشر يا {user.first_name}، تم تحويل طلبك للقسم المختص (التعاقدات) وسيتم التواصل معك.")
+        try: await update.message.delete()
+        except: pass
+        return
     # =================================================
     # 2. البحث الذكي عن الحي والمدينة
     # =================================================
