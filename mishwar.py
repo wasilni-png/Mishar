@@ -8,7 +8,6 @@ import time
 import os
 import re
 import random
-import google.generativeai as genai
 import urllib.parse  # أضف هذا الاستيراد في أعلى الملف
 from datetime import datetime
 from math import radians, cos, sin, asin, sqrt
@@ -17,6 +16,31 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardR
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
+from google import genai # الاستيراد الجديد
+import os
+import asyncio
+
+# إنشاء العميل مرة واحدة خارج الدالة
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+async def get_ai_response(message_text, user_name):
+    try:
+        # صياغة التعليمات ليفهم البوت هويته
+        instruction = f"أنت مساعد في بوت 'مشوارك'. اسم العميل {user_name}."
+        full_content = f"{instruction}\n\nرسالة العميل: {message_text}"
+
+        # تشغيل الطلب في خلفية مستقلة (Thread) لأن المكتبة الجديدة تزمنية (Sync)
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.0-flash", # استخدم 2.0 فلاش فهو الأحدث والمستقر حالياً
+            contents=full_content
+        )
+        
+        return response.text
+
+    except Exception as e:
+        print(f"🚨 خطأ في مكتبة GenAI الجديدة: {e}")
+        return "أهلاً بك! كيف يمكنني مساعدتك في مشوارك؟"
 
 # مكتبات Flask والويب
 from flask import Flask
@@ -237,45 +261,7 @@ def save_chat_log(sender_id, receiver_id, content, msg_type="text"):
 
 
 # ==================== 🛠️ 3. دوال مساعدة ====================
-async def get_ai_response(message_text, user_name):
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return "أهلاً بك! كيف يمكنني مساعدتك؟"
 
-    try:
-        genai.configure(api_key=api_key)
-        
-        # الحل: استخدام الاسم المباشر للموديل بدون بادئة 'models/' 
-        # جرب 'gemini-1.5-flash' أو 'gemini-pro' كبديل مستقر جداً
-        model = genai.GenerativeModel('gemini-1.5-flash') 
-        
-        # صياغة التعليمات (هنا يفهم البوت عمله)
-        system_instruction = f"""
-        أنت مساعد ذكي في بوت 'مشوارك' لتوصيل الركاب والطلبات.
-        العميل الحالي اسمه: {user_name}
-        مهمتك: الرد على استفساراته بأدب واختصار.
-        إذا سأل عن الحجز، وجهه للأزرار في القائمة.
-        """
-        
-        # إرسال الرسالة
-        response = await asyncio.to_thread(
-            model.generate_content, 
-            f"{system_instruction}\n\nرسالة العميل: {message_text}"
-        )
-        
-        if response and response.text:
-            return response.text
-            
-    except Exception as e:
-        # إذا فشل Flash، جرب الموديل المستقر Pro كخطة بديلة تلقائية
-        try:
-            model_alt = genai.GenerativeModel('gemini-pro')
-            response = await asyncio.to_thread(model_alt.generate_content, message_text)
-            return response.text
-        except:
-            print(f"🚨 فشل نهائي في Gemini: {e}")
-        
-    return "أهلاً بك! أنا هنا لمساعدتك في مشوارك، كيف يمكنني خدمتك؟"
 
 async def ai_parse_order(user_text):
     """استخراج الحي والوجهة من كلام الراكب"""
