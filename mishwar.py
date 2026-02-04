@@ -576,27 +576,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def find_drivers_in_district(district_name):
     conn = get_db_connection()
     if not conn: return []
-    
     try:
-        # تنظيف اسم الحي للبحث المرن
-        search_term = normalize_text(district_name)
-        
+        search_term = f"%{district_name}%" # للبحث عن "العزيزية" داخل "حي العزيزية، الهجرة"
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # نبحث عن السائقين الذين يحتوي عمود districts لديهم على اسم الحي
-            query = """
-                SELECT user_id, chat_id, name, car_info 
-                FROM users 
+            cur.execute("""
+                SELECT user_id, chat_id, name FROM users 
                 WHERE role = 'driver' 
-                AND is_verified = TRUE
+                AND is_verified = TRUE 
                 AND districts LIKE %s
-            """
-            cur.execute(query, (f"%{search_term}%",))
+            """, (search_term,))
             return cur.fetchall()
-    except Exception as e:
-        print(f"❌ خطأ في البحث عن السائقين: {e}")
-        return []
     finally:
         conn.close()
+
 
 # --- التسجيل ---
 # --- التسجيل المحدث ---
@@ -1237,35 +1229,35 @@ async def global_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ---------------------------------------------------------
     # [مرحلة الذكاء الاصطناعي] تحليل طلبات الركاب النصية
     # ---------------------------------------------------------
-    current_user_data = USER_CACHE.get(str(user_id), {})
-    user_role = current_user_data.get('role', 'rider')
-
+    # ---------------------------------------------------------
+    # [مرحلة الذكاء الاصطناعي] تحليل طلبات الركاب النصية
+    # ---------------------------------------------------------
     if user_role == 'rider' and not state and update.message.chat.type == "private":
         wait_msg = await update.message.reply_text("🤖 جاري قراءة طلبك.. لحظة بس..")
-        
-        # استدعاء التحليل
         ai_result = await ai_parse_order(text)
         
         try: await wait_msg.delete()
         except: pass
 
-        if ai_result.get('is_order') and ai_result.get('district'):
-            district = ai_result['district']
-            drivers = await find_drivers_in_district(district)
+        # إذا اكتشف الذكاء الاصطناعي أنه طلب مشوار
+        if ai_result.get('is_order'):
+            district = ai_result.get('district')
             
-            if drivers:
-                # إرسال الطلب للسائقين مع تمرير context
-                await send_order_to_drivers(drivers, text, user, context)
-                
-                await update.message.reply_text(
-                    f"✅ **أبشر يا غالي!**\n"
-                    f"📍 تم تحديد موقعك في حي: {district}\n"
-                    f"🚕 جاري إبلاغ الكباتن المتوفرين الآن.."
-                )
-                return  # ✨ ضروري جداً لمنع الذهاب للدعم الفني
-            else:
-                await update.message.reply_text(f"⚠️ فهمت أنك في {district}، لكن لا يوجد كباتن متاحين حالياً في هذا الحي.")
-                return  # ✨ ضروري جداً
+            if district:
+                drivers = await find_drivers_in_district(district)
+                if drivers:
+                    # 1. إرسال للسائقين
+                    await send_order_to_drivers(drivers, text, user, context)
+                    # 2. تأكيد للراكب
+                    await update.message.reply_text(f"✅ أبشر، جاري إبلاغ كباتن حي {district}..")
+                    return # 🛑 توقف هنا ولا تذهب للدعم الفني
+                else:
+                    await update.message.reply_text(f"⚠️ فهمت أنك في {district}، بس ما فيه كباتن متاحين حالياً.")
+                    return # 🛑 توقف هنا أيضاً
+            
+            # إذا كان طلب مشوار لكن لم يحدد الحي بوضوح
+            await update.message.reply_text("📍 يا غالي، ياليت تحدد الحي بوضوح عشان أقدر أرسل طلبك للكباتن.")
+            return # 🛑 توقف هنا
   
 
     # ---------------------------------------------------------
