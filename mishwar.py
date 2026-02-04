@@ -238,24 +238,34 @@ def save_chat_log(sender_id, receiver_id, content, msg_type="text"):
 
 # ==================== 🛠️ 3. دوال مساعدة ====================
 
+import asyncio # تأكد من وجود هذا السطر في أعلى الملف تماماً
+
 async def get_ai_response(message_text, user_name):
-    if not GEMINI_KEY:
-        print("🚨 خطأ: مفتاح GEMINI_API_KEY غير موجود في إعدادات ريندر")
+    # جلب المفتاح مباشرة من البيئة
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    if not api_key:
+        print("🚨 خطأ: مفتاح GEMINI_API_KEY غير موجود في إعدادات ريندر!")
         return "أهلاً بك! كيف يمكنني مساعدتك؟"
 
-    prompt = f"أنت مساعد في بوت توصيل. اسم العميل {user_name}. رد عليه باختصار: {message_text}"
-    
     try:
-        # ريندر يحتاج أحياناً لمهلة زمنية (timeout)
-        response = await asyncio.to_thread(
-            ai_model.generate_content, 
-            prompt
-        )
-        return response.text
+        # إعداد الموديل داخل الدالة لضمان التحديث
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        prompt = f"أنت مساعد في بوت توصيل مشاوير. رد باختصار على العميل {user_name}: {message_text}"
+        
+        # تنفيذ الطلب
+        response = await asyncio.to_thread(model.generate_content, prompt)
+        
+        if response and response.text:
+            return response.text
+            
     except Exception as e:
-        print(f"🚨 خطأ Gemini على ريندر: {e}")
-        return "أهلاً بك! كيف يمكنني مساعدتك اليوم؟"
-
+        # ⚠️ هذا السطر سيخبرك في الـ Logs ما هو الخطأ الحقيقي
+        print(f"🚨 خطأ الذكاء الاصطناعي: {str(e)}")
+        
+    return "أهلاً بك! كيف يمكنني مساعدتك اليوم في مشوارك؟"
 async def ai_parse_order(user_text):
     """استخراج الحي والوجهة من كلام الراكب"""
     prompt = f"""
