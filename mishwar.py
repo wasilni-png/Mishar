@@ -63,8 +63,6 @@ BOT_TOKEN = "8577472670:AAEBxzZGB4oipTNRAO2EWQzJy93BrP-H39Q"
 ADMIN_IDS = [8563113166, 7580027135, 5027690233]
 
 # إعداد مفتاح API الخاص بـ Gemini
-genai.configure(api_key="AIzaSyCubPuwJaRMWWxhwjPvkkT5hOivqtP79aw")
-ai_model = genai.GenerativeModel('gemini-pro')
 
 # الكلمات المفتاحية للبحث في المجموعات
 
@@ -573,33 +571,36 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # دالة مساعدة للتسجيل التلقائي لضمان عدم تكرار الكود
-async def find_drivers_in_district(district_name):
-    """البحث المرن عن السائقين في Supabase"""
-    # تجهيز النص للبحث عن الكلمة في أي مكان داخل السطر
-    search_pattern = f"%{district_name}%"
-    
+async def find_drivers_by_district_match(text):
+    """البحث عن السائقين بمطابقة النص مع الأحياء في قاعدة البيانات"""
     conn = get_db_connection()
-    if not conn:
-        return []
+    if not conn: return [], None
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # تم استخدام ILIKE ليكون البحث غير حساس للهمزات والتاء المربوطة
-            query = """
-                SELECT user_id, chat_id, name 
-                FROM users 
-                WHERE role = 'driver' 
-                AND is_verified = true 
-                AND districts ILIKE %s
-            """
-            cur.execute(query, (search_pattern,))
+            # جلب السائقين الموثقين فقط
+            cur.execute("SELECT chat_id, user_id, districts FROM users WHERE role = 'driver' AND is_verified = true")
             drivers = cur.fetchall()
-            return drivers
+            
+            matched_drivers = []
+            found_district = None
+            
+            for d in drivers:
+                if d['districts']:
+                    # تقسيم الأحياء (مثل: العزيزية، الهجرة) وفحص وجودها في نص العميل
+                    dist_list = [item.strip() for item in d['districts'].split('،')]
+                    for dist in dist_list:
+                        if dist in text: 
+                            matched_drivers.append(d)
+                            found_district = dist
+                            break
+            return matched_drivers, found_district
     except Exception as e:
-        print(f"❌ SQL Error: {e}")
-        return []
+        print(f"Error matching districts: {e}")
+        return [], None
     finally:
         conn.close()
+
 
 
 
@@ -1173,41 +1174,28 @@ async def global_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-        # ---------------------------------------------------------
-    # ✅ الموضع المثالي: [مرحلة الذكاء الاصطناعي]
+            # ---------------------------------------------------------
+    # 🚕 [نظام مطابقة الأحياء المباشر]
     # ---------------------------------------------------------
-    current_user_data = USER_CACHE.get(str(user_id), {})
-    user_role = current_user_data.get('role', 'rider')
-
-    main_buttons = ["🚖 طلب رحلة", "📞 تواصل مع الإدارة", "💰 محفظتي", "🔙 العودة للقائمة الرئيسية"]
-    
     if user_role == 'rider' and not state and update.message.chat.type == "private" and text not in main_buttons:
-        if text and not text.startswith('/'):
-            wait_msg = await update.message.reply_text("🤖 جاري قراءة طلبك.. لحظة بس..")
-            ai_result = await ai_parse_order(text)
-            
-            try: await wait_msg.delete()
-            except: pass
-
-            if ai_result.get('is_order'):
-                district = ai_result.get('district')
-                
-                if not district or district == "null":
-                    await update.message.reply_text("📍 استوعبت طلبك، بس ياليت تذكر اسم الحي بوضوح (مثلاً: حي العزيزية).")
-                    return
-
-                # البحث في Supabase
-                drivers = await find_drivers_in_district(district)
-                
-                if drivers:
-                    # إرسال الطلب للسائقين
-                    await send_order_to_drivers(drivers, text, user, context)
-                    await update.message.reply_text(f"✅ أبشر، تم تحديد موقعك في {district}.\n🚕 جاري إبلاغ {len(drivers)} كباتن متوفرين الآن..")
-                    return 
-                else:
-                    # هذه الرسالة ستظهر إذا كان الحي مسجل في DB بطريقة مختلفة
-                    await update.message.reply_text(f"📍 حددت أنك في {district}، بس ما فيه كباتن موثقين مسجلين بهذا الحي حالياً.")
-                    return
+        # البحث عن كباتن بناءً على الأحياء المذكورة في النص
+        drivers, district = await find_drivers_by_district_match(text)
+        
+        if drivers:
+            # إرسال الطلب للكباتن المكتشفين
+            await send_order_to_drivers(drivers, text, user, context)
+            await update.message.reply_text(
+                f"✅ تم تحديد حي **({district})** في طلبك.\n"
+                f"🚕 جاري إبلاغ {len(drivers)} كابتن متوفرين الآن.."
+            )
+            return  # توقف لمنع الذهاب للدعم الفني
+        else:
+            # إذا لم يجد أحياء مطابقة في النص
+            await update.message.reply_text(
+                "📍 استلمت رسالتك، ولكن لم أتعرف على حي محدد.\n"
+                "يرجى كتابة اسم الحي (مثال: حي العزيزية) لنوصلك بالكباتن."
+            )
+            return
   
     # 1. استلام الاسم
     if state == 'WAIT_NAME':
