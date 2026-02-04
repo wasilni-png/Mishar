@@ -574,37 +574,33 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # دالة مساعدة للتسجيل التلقائي لضمان عدم تكرار الكود
 async def find_drivers_in_district(district_name):
-    """البحث عن السائقين الموثقين الذين يغطون الحي المطلوب"""
+    """البحث المرن عن السائقين في Supabase"""
+    # تجهيز النص للبحث عن الكلمة في أي مكان داخل السطر
+    search_pattern = f"%{district_name}%"
+    
     conn = get_db_connection()
     if not conn:
         return []
-        
+    
     try:
-        # تحويل اسم الحي للبحث الجزئي (Wildcard Search)
-        # سيقوم بالبحث عن "العزيزية" داخل نص مثل "حي العزيزية، سلطانة"
-        search_term = f"%{district_name}%"
-        
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # الاستعلام يبحث عن:
-            # 1. الرتبة سائق (driver)
-            # 2. الحساب موثق (is_verified)
-            # 3. اسم الحي موجود ضمن عمود الأحياء (districts)
+            # تم استخدام ILIKE ليكون البحث غير حساس للهمزات والتاء المربوطة
             query = """
                 SELECT user_id, chat_id, name 
                 FROM users 
                 WHERE role = 'driver' 
-                AND is_verified = TRUE 
-                AND districts LIKE %s
+                AND is_verified = true 
+                AND districts ILIKE %s
             """
-            cur.execute(query, (search_term,))
+            cur.execute(query, (search_pattern,))
             drivers = cur.fetchall()
             return drivers
-            
     except Exception as e:
-        print(f"❌ Database Search Error: {e}")
+        print(f"❌ SQL Error: {e}")
         return []
     finally:
         conn.close()
+
 
 
 
@@ -1177,38 +1173,41 @@ async def global_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-    # ---------------------------------------------------------
+        # ---------------------------------------------------------
     # ✅ الموضع المثالي: [مرحلة الذكاء الاصطناعي]
     # ---------------------------------------------------------
     current_user_data = USER_CACHE.get(str(user_id), {})
     user_role = current_user_data.get('role', 'rider')
 
-    # نفعل الذكاء الاصطناعي فقط للراكب، وفي الخاص، وبشرط عدم وجود حالة (state) نشطة
-    # وأيضاً نتأكد أن النص ليس أحد أزرار القائمة الرئيسية
     main_buttons = ["🚖 طلب رحلة", "📞 تواصل مع الإدارة", "💰 محفظتي", "🔙 العودة للقائمة الرئيسية"]
     
     if user_role == 'rider' and not state and update.message.chat.type == "private" and text not in main_buttons:
-        wait_msg = await update.message.reply_text("🤖 جاري قراءة طلبك.. لحظة بس..")
-        ai_result = await ai_parse_order(text)
-        
-        try: await wait_msg.delete()
-        except: pass
+        if text and not text.startswith('/'):
+            wait_msg = await update.message.reply_text("🤖 جاري قراءة طلبك.. لحظة بس..")
+            ai_result = await ai_parse_order(text)
+            
+            try: await wait_msg.delete()
+            except: pass
 
-        if ai_result.get('is_order'):
-            district = ai_result.get('district')
-            if district:
+            if ai_result.get('is_order'):
+                district = ai_result.get('district')
+                
+                if not district or district == "null":
+                    await update.message.reply_text("📍 استوعبت طلبك، بس ياليت تذكر اسم الحي بوضوح (مثلاً: حي العزيزية).")
+                    return
+
+                # البحث في Supabase
                 drivers = await find_drivers_in_district(district)
+                
                 if drivers:
+                    # إرسال الطلب للسائقين
                     await send_order_to_drivers(drivers, text, user, context)
-                    await update.message.reply_text(f"✅ أبشر، جاري إبلاغ كباتن حي {district}..")
+                    await update.message.reply_text(f"✅ أبشر، تم تحديد موقعك في {district}.\n🚕 جاري إبلاغ {len(drivers)} كباتن متوفرين الآن..")
                     return 
                 else:
-                    await update.message.reply_text(f"📍 فهمت أنك في {district}، بس ما فيه كباتن متاحين حالياً.")
-                    return 
-            
-            await update.message.reply_text("📍 يا غالي، ياليت تحدد الحي بوضوح عشان أقدر أرسل طلبك للكباتن.")
-            return 
-
+                    # هذه الرسالة ستظهر إذا كان الحي مسجل في DB بطريقة مختلفة
+                    await update.message.reply_text(f"📍 حددت أنك في {district}، بس ما فيه كباتن موثقين مسجلين بهذا الحي حالياً.")
+                    return
   
     # 1. استلام الاسم
     if state == 'WAIT_NAME':
