@@ -244,21 +244,38 @@ async def get_ai_response(message_text, user_name):
 
     try:
         genai.configure(api_key=api_key)
-        # تغيير الموديل للاسم الكامل والمستقر
-        model = genai.GenerativeModel('models/gemini-1.5-flash') 
         
-        prompt = f"أنت مساعد في بوت توصيل مشاوير. رد باختصار على العميل {user_name}: {message_text}"
+        # الحل: استخدام الاسم المباشر للموديل بدون بادئة 'models/' 
+        # جرب 'gemini-1.5-flash' أو 'gemini-pro' كبديل مستقر جداً
+        model = genai.GenerativeModel('gemini-1.5-flash') 
         
-        # تجربة استخدام generate_content مباشرة
-        response = await asyncio.to_thread(model.generate_content, prompt)
+        # صياغة التعليمات (هنا يفهم البوت عمله)
+        system_instruction = f"""
+        أنت مساعد ذكي في بوت 'مشوارك' لتوصيل الركاب والطلبات.
+        العميل الحالي اسمه: {user_name}
+        مهمتك: الرد على استفساراته بأدب واختصار.
+        إذا سأل عن الحجز، وجهه للأزرار في القائمة.
+        """
+        
+        # إرسال الرسالة
+        response = await asyncio.to_thread(
+            model.generate_content, 
+            f"{system_instruction}\n\nرسالة العميل: {message_text}"
+        )
         
         if response and response.text:
             return response.text
             
     except Exception as e:
-        print(f"🚨 خطأ Gemini الجديد: {str(e)}")
+        # إذا فشل Flash، جرب الموديل المستقر Pro كخطة بديلة تلقائية
+        try:
+            model_alt = genai.GenerativeModel('gemini-pro')
+            response = await asyncio.to_thread(model_alt.generate_content, message_text)
+            return response.text
+        except:
+            print(f"🚨 فشل نهائي في Gemini: {e}")
         
-    return "أهلاً بك! كيف يمكنني مساعدتك اليوم في مشوارك؟"
+    return "أهلاً بك! أنا هنا لمساعدتك في مشوارك، كيف يمكنني خدمتك؟"
 
 async def ai_parse_order(user_text):
     """استخراج الحي والوجهة من كلام الراكب"""
