@@ -1201,13 +1201,13 @@ async def global_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if drivers:
                     await send_order_to_drivers(drivers, text, user, context)
                     await update.message.reply_text(f"✅ أبشر، جاري إبلاغ كباتن حي {district}..")
-                    return # 🛑 يخرج من الدالة ولا يكمل للدعم الفني
+                    return 
                 else:
                     await update.message.reply_text(f"📍 فهمت أنك في {district}، بس ما فيه كباتن متاحين حالياً.")
-                    return # 🛑 يخرج لكي لا تذهب الرسالة للدعم الفني
+                    return 
             
             await update.message.reply_text("📍 يا غالي، ياليت تحدد الحي بوضوح عشان أقدر أرسل طلبك للكباتن.")
-            return # 🛑 يخرج
+            return 
 
   
     # 1. استلام الاسم
@@ -1581,66 +1581,7 @@ async def global_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("تم الإلغاء.", reply_markup=get_main_kb(context.user_data.get('role', 'rider')))
         return
 
-    # ---------------------------------------------------------
-    # [المرحلة النهائية] إرسال الرسائل المجهولة للأدمن
-    # ---------------------------------------------------------
-    # إذا وصل الكود هنا، فهذا يعني:
-    # 1. ليست محادثة نشطة.
-    # 2. ليست خطوة تسجيل أو طلب.
-    # 3. ليس زر قائمة رئيسية.
-    # إذن هي --> رسالة استفسار/دعم فني.
-
-    # تأكيد أخير أنها في الخاص وليست في مجموعة
-        # تعديل بسيط في النهاية
-    # التأكد أن الرسالة خاصة، تحتوي نصاً، والمرسل ليس من الإدارة
-    if update.message.chat.type == "private" and text and user_id not in ADMIN_IDS:
-        
-        # 1. تجهيز الرسالة للأدمن باستخدام HTML لمنع أخطاء الرموز الخاصة
-        admin_text = (
-            f"📩 <b>رسالة واردة (دعم فني)</b>\n"
-            f"👤 <b>الاسم:</b> {user.full_name}\n"
-            f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
-            f"🔗 <b>المعرف:</b> @{user.username if user.username else 'لا يوجد'}\n"
-            f"📝 <b>النص:</b> {text}\n"
-            f"─────────────────\n"
-            f"💡 للرد عليه، قم بعمل (Reply) على هذه الرسالة."
-        )
-
-        # 2. أزرار التحكم
-        kb = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🚫 حظر", callback_data=f"admin_block_{user_id}"),
-                InlineKeyboardButton("💰 شحن", callback_data=f"admin_quickcash_{user_id}")
-            ]
-        ])
-
-        # 3. الإرسال لكل المشرفين باستخدام التنسيق الجديد
-        for aid in ADMIN_IDS:
-            try:
-                # إرسال بيانات المستخدم بتنسيق HTML
-                await context.bot.send_message(
-                    chat_id=aid, 
-                    text=admin_text, 
-                    reply_markup=kb, 
-                    parse_mode="HTML" # تم التغيير من MARKDOWN إلى HTML لضمان عدم حدوث خطأ parse
-                )
-                # تحويل الرسالة الأصلية
-                await context.bot.copy_message(
-                    chat_id=aid, 
-                    from_chat_id=user_id, 
-                    message_id=update.message.message_id
-                )
-            except Exception as e:
-                print(f"Error sending to admin {aid}: {e}")
-
-        # 4. حفظ في السجل
-        save_chat_log(user_id, ADMIN_IDS[0], text or "[ملف/موقع]", "support_msg")
-
-        # 5. إشعار المستخدم
-        await update.message.reply_text("📨 تم استلام رسالتك وتحويلها لفريق الدعم.")
-        
-        return
-
+    
 # --- معالجة المواقع (Location) ---
 
 async def admin_panel_view(update, context):
