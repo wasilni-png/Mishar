@@ -2,5 +2,6 @@ python-telegram-bot[job-queue]
 psycopg2-binary
 flask
 geopy
-httpx
-google-generativeai
+httpx[http2]
+google-generativeai>=0.8.0
+python-dotenv
