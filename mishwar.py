@@ -64,8 +64,15 @@ BOT_TOKEN = "7687724209:AAF-Wq75Qk-NCLjARYie36z_yJbP65t8zBg"
 ADMIN_IDS = [8563113166, 7580027135, 5027690233]
 
 # إعداد الذكاء الاصطناعي
-genai.configure(api_key="AIzaSyDJ9S7FQt3OPIALjBIP3FzB9MSo_J6eEh8")
-model = genai.GenerativeModel('gemini-pro')
+
+
+# جلب المفتاح من إعدادات ريندر
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_KEY)
+
+# استخدام فلاش 1.5 لأنه الأنسب لسيرفرات ريندر المجانية (خفيف وسريع)
+ai_model = genai.GenerativeModel('gemini-1.5-flash')
+
 
 # إعداد مفتاح API الخاص بـ Gemini
 
@@ -231,27 +238,24 @@ def save_chat_log(sender_id, receiver_id, content, msg_type="text"):
 
 # ==================== 🛠️ 3. دوال مساعدة ====================
 
-
 async def get_ai_response(message_text, user_name):
-    """دالة تتواصل مع الذكاء الاصطناعي وتولد رداً ذكياً"""
-    prompt = f"""
-    أنت موظف استقبال ذكي وودود في بوت 'مشوارك' لتوصيل المشاوير.
-    اسم العميل: {user_name}
-    رسالة العميل: {message_text}
+    if not GEMINI_KEY:
+        print("🚨 خطأ: مفتاح GEMINI_API_KEY غير موجود في إعدادات ريندر")
+        return "أهلاً بك! كيف يمكنني مساعدتك؟"
+
+    prompt = f"أنت مساعد في بوت توصيل. اسم العميل {user_name}. رد عليه باختصار: {message_text}"
     
-    التعليمات:
-    1. رد بلهجة مهذبة ومختصرة.
-    2. إذا كانت تحية (مثل السلام عليكم)، رد بالتحية والترحيب.
-    3. إذا سأل عن طلب رحلة، أخبره باستخدام الزر من القائمة.
-    4. لا تذكر أنك ذكاء اصطناعي إلا إذا سألك العميل مباشرة.
-    """
     try:
-        # تشغيل الطلب في خلفية البوت لكي لا يتوقف عن العمل
-        response = await asyncio.to_thread(ai_model.generate_content, prompt)
+        # ريندر يحتاج أحياناً لمهلة زمنية (timeout)
+        response = await asyncio.to_thread(
+            ai_model.generate_content, 
+            prompt
+        )
         return response.text
     except Exception as e:
-        print(f"❌ خطأ في AI: {e}")
-        return "أهلاً بك! كيف يمكنني مساعدتك اليوم في مشوارك؟"
+        print(f"🚨 خطأ Gemini على ريندر: {e}")
+        return "أهلاً بك! كيف يمكنني مساعدتك اليوم؟"
+
 async def ai_parse_order(user_text):
     """استخراج الحي والوجهة من كلام الراكب"""
     prompt = f"""
@@ -3633,17 +3637,29 @@ async def admin_show_user_details(update, context, target_id):
 
 async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
-    user_id = update.effective_user.id
     
-    # جلب بياناته من الكاش ليعرف البوت مع من يتحدث
-    user = USER_CACHE.get(user_id) or USER_CACHE.get(str(user_id)) or {}
-    user_name = user.get('name', 'عزيزي')
+    # ❌ قائمة الكلمات التي يجب أن يتجاهلها الذكاء الاصطناعي (أزرار التحكم)
+    excluded_texts = ["قائمة السائقين", "طلب رحلة", "إلغاء", "لوحة التحكم"]
+    if user_text in excluded_texts:
+        return
 
-    # إرسال النص للذكاء الاصطناعي (Gemini)
-    # ملاحظة: سنقوم بتعريف دالة get_ai_response لاحقاً
-    response = await get_ai_response(user_text, user_name)
-    
-    await update.message.reply_text(response)
+    # 1. جلب بيانات المستخدم
+    user_id = update.effective_user.id
+    user = USER_CACHE.get(user_id) or USER_CACHE.get(str(user_id)) or {}
+    user_name = user.get('name', update.effective_user.first_name)
+
+    # 2. فحص الاتصال بالذكاء الاصطناعي (تصحيح الخطأ الذي يظهر لك)
+    try:
+        # تأكد من أنك قمت بـ import asyncio في أعلى الملف
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        
+        # استدعاء Gemini
+        response = await get_ai_response(user_text, user_name)
+        
+        await update.message.reply_text(response)
+    except Exception as e:
+        print(f"🚨 AI Error: {e}")
+        # لا ترسل رسالة الطوارئ هنا لكي لا تظهر دائماً، اصمت إذا فشل
 
 # ==================== 🌐 5. خادم Flask (للبقاء نشطاً) ====================
 
@@ -3761,7 +3777,7 @@ def main():
     ), group=2)
     
     application.add_handler(MessageHandler(filters.ChatType.GROUPS, track_groups_from_messages), group=2)
-
+    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_all_messages), group=2)
 
     # ---------------------------------------------------------
     # المجموعة 3: نظام التوجيه (Chat Relay)
