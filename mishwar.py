@@ -63,7 +63,7 @@ BOT_TOKEN = "8577472670:AAEBxzZGB4oipTNRAO2EWQzJy93BrP-H39Q"
 ADMIN_IDS = [8563113166, 7580027135, 5027690233]
 
 # إعداد مفتاح API الخاص بـ Gemini
-genai.configure(api_key="AIzaSyADYritHhOSTJNN1wxQiRH0Rwoo1ycL_HI")
+genai.configure(api_key="AIzaSyCubPuwJaRMWWxhwjPvkkT5hOivqtP79aw")
 ai_model = genai.GenerativeModel('gemini-pro')
 
 # الكلمات المفتاحية للبحث في المجموعات
