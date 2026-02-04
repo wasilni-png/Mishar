@@ -574,20 +574,38 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # دالة مساعدة للتسجيل التلقائي لضمان عدم تكرار الكود
 async def find_drivers_in_district(district_name):
+    """البحث عن السائقين الموثقين الذين يغطون الحي المطلوب"""
     conn = get_db_connection()
-    if not conn: return []
+    if not conn:
+        return []
+        
     try:
-        search_term = f"%{district_name}%" # للبحث عن "العزيزية" داخل "حي العزيزية، الهجرة"
+        # تحويل اسم الحي للبحث الجزئي (Wildcard Search)
+        # سيقوم بالبحث عن "العزيزية" داخل نص مثل "حي العزيزية، سلطانة"
+        search_term = f"%{district_name}%"
+        
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""
-                SELECT user_id, chat_id, name FROM users 
+            # الاستعلام يبحث عن:
+            # 1. الرتبة سائق (driver)
+            # 2. الحساب موثق (is_verified)
+            # 3. اسم الحي موجود ضمن عمود الأحياء (districts)
+            query = """
+                SELECT user_id, chat_id, name 
+                FROM users 
                 WHERE role = 'driver' 
                 AND is_verified = TRUE 
                 AND districts LIKE %s
-            """, (search_term,))
-            return cur.fetchall()
+            """
+            cur.execute(query, (search_term,))
+            drivers = cur.fetchall()
+            return drivers
+            
+    except Exception as e:
+        print(f"❌ Database Search Error: {e}")
+        return []
     finally:
         conn.close()
+
 
 
 # --- التسجيل ---
