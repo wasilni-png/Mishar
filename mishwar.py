@@ -1158,7 +1158,40 @@ async def global_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop('bidding_for_rider', None)
         return
 
+
+    # ---------------------------------------------------------
+    # ✅ الموضع المثالي: [مرحلة الذكاء الاصطناعي]
+    # ---------------------------------------------------------
+    current_user_data = USER_CACHE.get(str(user_id), {})
+    user_role = current_user_data.get('role', 'rider')
+
+    # نفعل الذكاء الاصطناعي فقط للراكب، وفي الخاص، وبشرط عدم وجود حالة (state) نشطة
+    # وأيضاً نتأكد أن النص ليس أحد أزرار القائمة الرئيسية
+    main_buttons = ["🚖 طلب رحلة", "📞 تواصل مع الإدارة", "💰 محفظتي", "🔙 العودة للقائمة الرئيسية"]
     
+    if user_role == 'rider' and not state and update.message.chat.type == "private" and text not in main_buttons:
+        wait_msg = await update.message.reply_text("🤖 جاري قراءة طلبك.. لحظة بس..")
+        ai_result = await ai_parse_order(text)
+        
+        try: await wait_msg.delete()
+        except: pass
+
+        if ai_result.get('is_order'):
+            district = ai_result.get('district')
+            if district:
+                drivers = await find_drivers_in_district(district)
+                if drivers:
+                    await send_order_to_drivers(drivers, text, user, context)
+                    await update.message.reply_text(f"✅ أبشر، جاري إبلاغ كباتن حي {district}..")
+                    return # 🛑 يخرج من الدالة ولا يكمل للدعم الفني
+                else:
+                    await update.message.reply_text(f"📍 فهمت أنك في {district}، بس ما فيه كباتن متاحين حالياً.")
+                    return # 🛑 يخرج لكي لا تذهب الرسالة للدعم الفني
+            
+            await update.message.reply_text("📍 يا غالي، ياليت تحدد الحي بوضوح عشان أقدر أرسل طلبك للكباتن.")
+            return # 🛑 يخرج
+
+  
     # 1. استلام الاسم
     if state == 'WAIT_NAME':
         context.user_data['reg_name'] = text
@@ -1226,39 +1259,7 @@ async def global_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # استخراج البيانات
     
-    # ---------------------------------------------------------
-    # [مرحلة الذكاء الاصطناعي] تحليل طلبات الركاب النصية
-    # ---------------------------------------------------------
-    # ---------------------------------------------------------
-    # [مرحلة الذكاء الاصطناعي] تحليل طلبات الركاب النصية
-    # ---------------------------------------------------------
-    if user_role == 'rider' and not state and update.message.chat.type == "private":
-        wait_msg = await update.message.reply_text("🤖 جاري قراءة طلبك.. لحظة بس..")
-        ai_result = await ai_parse_order(text)
-        
-        try: await wait_msg.delete()
-        except: pass
 
-        # إذا اكتشف الذكاء الاصطناعي أنه طلب مشوار
-        if ai_result.get('is_order'):
-            district = ai_result.get('district')
-            
-            if district:
-                drivers = await find_drivers_in_district(district)
-                if drivers:
-                    # 1. إرسال للسائقين
-                    await send_order_to_drivers(drivers, text, user, context)
-                    # 2. تأكيد للراكب
-                    await update.message.reply_text(f"✅ أبشر، جاري إبلاغ كباتن حي {district}..")
-                    return # 🛑 توقف هنا ولا تذهب للدعم الفني
-                else:
-                    await update.message.reply_text(f"⚠️ فهمت أنك في {district}، بس ما فيه كباتن متاحين حالياً.")
-                    return # 🛑 توقف هنا أيضاً
-            
-            # إذا كان طلب مشوار لكن لم يحدد الحي بوضوح
-            await update.message.reply_text("📍 يا غالي، ياليت تحدد الحي بوضوح عشان أقدر أرسل طلبك للكباتن.")
-            return # 🛑 توقف هنا
-  
 
     # ---------------------------------------------------------
     # [الفلتر الثالث] معالجة حالات البوت (States)
