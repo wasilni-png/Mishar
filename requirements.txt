@@ -3,4 +3,4 @@ psycopg2-binary
 flask
 geopy
 httpx
-google.generativeai
+-U google-generativeai
