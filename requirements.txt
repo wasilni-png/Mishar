@@ -2,6 +2,6 @@ python-telegram-bot[job-queue]
 psycopg2-binary
 flask
 geopy
-httpx[http2]
-google-genai
-python-dotenv
+httpx
+tgcrypto
+pytz
