@@ -3808,7 +3808,7 @@ async def contact_admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE
     admin_text = (
         "📝 **أرسل رسالتك أو شكواك الآن في رسالة واحدة:**\n\n"
         "أو يمكنك التحدث مباشرة عبر الرابط التالي:\n"
-        "👤 @x3FreTx"
+        "👤 @Servecestu"
     )
     
     await update.message.reply_text(
