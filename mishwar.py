@@ -1015,7 +1015,7 @@ async def complete_registration(update, context, name, phone=None, plate=None):
         if role == 'driver':
             support_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("💬 مراسلة الإدارة", callback_data="contact_admin_start")],
-                [InlineKeyboardButton("👤 الحساب المباشر", url="https://t.me/x3FreTx")]
+                [InlineKeyboardButton("👤 الحساب المباشر", url="https://t.me/Servecestu")]
             ])
             
             await context.bot.send_message(
