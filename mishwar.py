@@ -3583,16 +3583,27 @@ async def group_order_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE
                 matched_drivers.append(d)
 
         if matched_drivers:
-            # 1. إشعار الراكب (أول 6 كباتن مشتركين فقط)
+            # 1. إشعار الراكب (أول 10 كباتن مشتركين فقط)
             drivers_to_show = matched_drivers[:10]
             
-            # بناء أزرار الكباتن المشتركين
             kb = []
             for d in drivers_to_show:
-                kb.append([InlineKeyboardButton(f"🚖 اطلب الكابتن {d['name']}", url=f"https://t.me/{context.bot.username}?start=order_{d['user_id']}")])
+                # تجهيز رابط التواصل المباشر:
+                # إذا كان للسائق يوزر نيم نستخدمه، وإذا لم يوجد نستخدم رابط الـ ID المباشر
+                if d.get('username'):
+                    direct_contact_url = f"https://t.me/{d['username']}"
+                else:
+                    direct_contact_url = f"tg://user?id={d['user_id']}"
+                
+                # إضافة الزر برابط التواصل المباشر
+                kb.append([InlineKeyboardButton(
+                    text=f"🚖 مراسلة الكابتن {d['name']} (مباشر)", 
+                    url=direct_contact_url
+                )])
             
             await update.message.reply_text(
-                f"✅ أبشر يا {user.first_name}، وجدنا كباتن **مشتركين** متاحين في حي **{found_dist}**:\nاضغط على اسم الكابتن للتواصل المباشر:",
+                f"✅ أبشر يا {user.first_name}، وجدنا كباتن **مشتركين** متاحين في حي **{found_dist}**:\n"
+                "اضغط على اسم الكابتن لمراسلته فوراً:",
                 reply_markup=InlineKeyboardMarkup(kb),
                 parse_mode="Markdown"
             )
