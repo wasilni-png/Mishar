@@ -604,6 +604,28 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         arg_value = context.args[0]
 
+        # --- حالة مراسلة عميل (contact_) تضاف هنا ---
+        if arg_value.startswith("contact_"):
+            customer_id = arg_value.replace("contact_", "")
+            
+            # التحقق: هل الشخص الذي ضغط الزر (السائق) مسجل لدينا ككابتن؟
+            if is_registered and user.get('role') == 'driver':
+                # إنشاء زر يفتح بروفايل الراكب مباشرة
+                profile_button = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("👤 فتح بروفايل العميل الآن", url=f"tg://user?id={customer_id}")]
+                ])
+                
+                await update.message.reply_text(
+                    "✅ **جاهز للتوصيل؟**\n"
+                    "اضغط على الزر أدناه لفتح محادثة مع العميل مباشرة، أو اضغط على (بدء المحادثة) في شاشة التليجرام.",
+                    reply_markup=profile_button,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            else:
+                # إذا كان الشخص غير مسجل أو ليس سائقاً
+                await update.message.reply_text("⚠️ عذراً، هذه الميزة مخصصة للكباتن المسجلين فقط.")
+            return
+
         # --- حالة طلب رحلة (order_) ---
         if arg_value.startswith("order_"):
             target_id = arg_value.replace("order_", "")
